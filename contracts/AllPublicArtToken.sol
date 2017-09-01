@@ -1,6 +1,6 @@
 pragma solidity ^0.4.13;
 
-import "zeppelin-solidity/token/MintableToken.sol";
+import "zeppelin-solidity/contracts/token/MintableToken.sol";
 
 /**
  * @title All Public Art Token contract - ERC20 compatible token contract.

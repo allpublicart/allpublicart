@@ -1,8 +1,8 @@
 pragma solidity ^0.4.13;
 
 import "./AllPublicArtToken.sol";
-import "zeppelin-solidity/crowdsale/CappedCrowdsale.sol";
-import "zeppelin-solidity/crowdsale/RefundableCrowdsale.sol";
+import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
+import "zeppelin-solidity/contracts/crowdsale/RefundableCrowdsale.sol";
 
 /**
  * @title All Public Art Crowdsale contract - crowdsale contract for the APA tokens.
