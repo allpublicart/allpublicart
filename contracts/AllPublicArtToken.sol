@@ -11,11 +11,12 @@ contract AllPublicArtToken is MintableToken {
     string public constant symbol = "APA";
     uint8 public constant decimals = 18;
     uint256 public maxSupply = 1000000000e18;
-    uint256 public companyAllocation = 10000000e18; // Ask Graham whether there is company allocation. Used 10 % of total token supply for now.
+    uint256 public companyAllocation = 20000000e18; // 20 % of total token supply allocated to company.
 
-    function AllPublicArtToken(address company) {
+    function AllPublicArtToken() {
         // allocate tokens for company
-        mint(company, companyAllocation);
+        foundersAllocation = new FoundersAllocation();
+        mint(foundersAllocation, companyAllocation);
     }
 
     function mint(address _to, uint256 _amount) onlyOwner canMint returns (bool) {
