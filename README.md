@@ -23,7 +23,7 @@
   - `testrpc --accounts="10"`
 
 - Deploy contracts
- - `node_modules/.bin/truffle migrate`
+  - `node_modules/.bin/truffle migrate`
 
 ## Running tests
   - `node_modules/.bin/truffle test`
