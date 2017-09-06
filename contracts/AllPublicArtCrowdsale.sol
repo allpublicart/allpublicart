@@ -1,8 +1,8 @@
 pragma solidity ^0.4.13;
 
-import "./AllPublicArtToken.sol";
 import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
 import "zeppelin-solidity/contracts/crowdsale/RefundableCrowdsale.sol";
+import "./AllPublicArtToken.sol";
 import "./WhitelistedCrowdsale.sol";
 import "./CompanyAllocation.sol";
 
@@ -106,7 +106,8 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
 
        // emit tokens for the company
        token.mint(companyAllocation, COMPANY_SHARE.mul(finalSupply).div(TOTAL_SHARE));
-       super;
+
+       super.finalization();
     }
 
     function () payable {
