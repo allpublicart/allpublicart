@@ -16,7 +16,7 @@ contract CompanyAllocation is Ownable {
     AllPublicArtToken apa;
 
     function CompanyAllocationContract() {
-        apa = AllPublicArt(msg.sender);
+        apa = AllPublicArtToken(msg.sender);
         uint oneMonth = 30 days;
         unlockedAt = now.add(oneMonth);
     }
@@ -50,7 +50,7 @@ contract CompanyAllocation is Ownable {
         companyAllocations[msg.sender] = 0;
 
         // Will fail if allocation (and therefore toTransfer) is 0.
-        if (!apa.transfer(msg.sender, transferAllocation)) throw;
+        require(apa.transfer(msg.sender, transferAllocation));
     }
 
     /*
