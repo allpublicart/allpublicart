@@ -107,9 +107,9 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
        // emit tokens for the company
        token.mint(companyAllocation, COMPANY_SHARE.mul(finalSupply).div(TOTAL_SHARE));
        super;
-   }
+    }
 
-   function () payable {
+    function () payable {
         buyTokens(msg.sender);
-   }
+    }
 }
