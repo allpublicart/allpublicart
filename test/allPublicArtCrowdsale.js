@@ -3,6 +3,7 @@ const AllPublicArtToken = artifacts.require("./AllPublicArtToken.sol");
 
 const { isException, ensuresException, getBlockNow } = require('./helpers/utils')
 const expect = require('chai').expect
+const should = require('should')
 
 const BigNumber = web3.BigNumber
 
@@ -31,6 +32,6 @@ contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchas
 
   it('has a cap', async () => {
       const crowdsaleCap = await apaCrowdsale.cap()
-      assert.equal(crowdsaleCap.toNumber(), cap)
+      crowdsaleCap.toNumber().should.equal(cap.toNumber())
   });
 });
