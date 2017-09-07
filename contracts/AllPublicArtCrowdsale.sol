@@ -19,6 +19,11 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
     uint256 public constant COMPANY_SHARE = 20; // 20 % of total token supply allocated to company.
     CompanyAllocation companyAllocation;
 
+    // bonus milestones
+    uint256 public firstBonusSalesEnds;
+    uint256 public secondBonusSalesEnds;
+    uint256 public thirdBonusSalesEnds;
+
     // customize the rate for each whitelisted buyer
     mapping (address => uint256) public buyerRate;
 
@@ -33,9 +38,14 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
         RefundableCrowdsale(_goal)
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
-    //As goal needs to be met for a successful crowdsale
-    //the value needs to be less or equal than a cap which is the limit for accepted funds
+        //As goal needs to be met for a successful crowdsale
+        //the value needs to be less or equal than a cap which is the limit for accepted funds
         require(_goal <= _cap);
+
+        // setup for token bonus milestones
+        firstBonusSalesEnds = startTime + 7 days;             // 1. end of 1st week
+        secondBonusSalesEnds = firstBonusSalesEnds + 7 days; // 2. end of 2nd week
+        thirdBonusSalesEnds = secondBonusSalesEnds + 7 days; // 3. end of third week
     }
 
     function createTokenContract() internal returns (MintableToken) {
@@ -51,7 +61,6 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
 
         PreferentialUserRateChange(buyer, rate);
     }
-
 
     function setPreferantialRate(uint256 rate) onlyOwner public {
         require(rate != 0);
@@ -73,8 +82,9 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
             return preferentialRate;
         }
 
-        // otherwise compute the price for the auction
-        // TODO calculate normal the timestamps the discounts happen
+        // otherwise compute the price with any bonus if applicable
+        uint256 bonus = rate.mul(getBonusTier()).div(100);
+        rate = rate.add(bonus);
 
         return rate;
     }
@@ -108,6 +118,21 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
        token.mint(companyAllocation, COMPANY_SHARE.mul(finalSupply).div(TOTAL_SHARE));
 
        super.finalization();
+    }
+
+    /**
+     * @dev Fetchs Bonus tier percentage per bonus milestones
+     */
+    function getBonusTier() internal returns (uint256) {
+        bool firstBonusSalesPeriod = now >= startTime && now <= firstBonusSalesEnds; // 1st week 15% bonus
+        bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 2nd week 10% bonus
+        bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; // 3rd week 5% bonus
+        bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; // 4th week on 0 % bonus
+
+        if (firstBonusSalesPeriod) return 15;
+        if (secondBonusSalesPeriod) return 10;
+        if (thirdBonusSalesPeriod) return 5;
+        if (fourthBonusSalesPeriod) return 0;
     }
 
     function () payable {
