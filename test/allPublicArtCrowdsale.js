@@ -9,7 +9,6 @@ const BigNumber = web3.BigNumber
 
 contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchaser2]) => {
     const rate = new BigNumber(500)
-    const goal = new BigNumber(900)
     const cap = new BigNumber(1000)
 
     let startTime, endTime
@@ -23,7 +22,6 @@ contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchas
             startTime,
             endTime,
             rate,
-            goal,
             cap,
             wallet
         )

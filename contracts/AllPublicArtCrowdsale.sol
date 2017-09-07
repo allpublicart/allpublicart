@@ -1,7 +1,7 @@
 pragma solidity ^0.4.13;
 
 import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
-import "zeppelin-solidity/contracts/crowdsale/RefundableCrowdsale.sol";
+import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
 import "./AllPublicArtToken.sol";
 import "./WhitelistedCrowdsale.sol";
 import "./CompanyAllocation.sol";
@@ -10,7 +10,7 @@ import "./CompanyAllocation.sol";
  * @title All Public Art Crowdsale contract - crowdsale contract for the APA tokens.
  * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
  */
-contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, RefundableCrowdsale {
+contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, FinalizableCrowdsale {
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
 
@@ -31,16 +31,12 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Refunda
     event PreferentialUserRateChange(address indexed buyer, uint256 rate);
     event PreferentialRateChange(uint256 rate);
 
-    function AllPublicArtCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _goal, uint256 _cap, address   _wallet)
+    function AllPublicArtCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _cap, address   _wallet)
         CappedCrowdsale(_cap)
         FinalizableCrowdsale()
         WhitelistedCrowdsale()
-        RefundableCrowdsale(_goal)
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
-        //As goal needs to be met for a successful crowdsale
-        //the value needs to be less or equal than a cap which is the limit for accepted funds
-        require(_goal <= _cap);
 
         // setup for token bonus milestones
         firstBonusSalesEnds = startTime + 7 days;             // 1. end of 1st week
