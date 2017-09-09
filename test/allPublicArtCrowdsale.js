@@ -7,11 +7,14 @@ import timer from './helpers/timer'
 const BigNumber = web3.BigNumber
 
 contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchaser2]) => {
-    const rate = new BigNumber(500)
+    const rate = new BigNumber(50)
     const cap = new BigNumber(1000)
 
     const preferentialRate = new BigNumber(20)
-    const value = 1e+18
+    const value = 1
+
+    const expectedCompanyTokens = new BigNumber(14)
+    const expectedTokenSupply = new BigNumber(71)
 
     let startTime, endTime
     let apaCrowdsale, apaToken
@@ -45,11 +48,31 @@ contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchas
       timer(20)
       await apaCrowdsale.addToWhitelist(buyer)
 
-      await apaCrowdsale.buyTokens.sendTransaction(buyer, { value, from: buyer })
+      await apaCrowdsale.buyTokens(buyer, { value })
+
       const balance = await apaToken.balanceOf.call(buyer)
-      console.log('balance', balance) // NOTE: note sure why balance is 0 here
+      balance.should.be.bignumber.equal(57)
 
       const raised = await apaCrowdsale.weiRaised();
       raised.should.be.bignumber.equal(value)
+  })
+
+  it('assigns tokens correctly to company when finalized', async function () {
+    timer(20)
+
+    await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
+
+    timer(endTime + 30)
+    await apaCrowdsale.finalize()
+
+    const companyAllocation = await apaCrowdsale.companyAllocation()
+    const balance = await apaToken.balanceOf(companyAllocation)
+    balance.should.be.bignumber.equal(expectedCompanyTokens)
+
+    const buyerBalance = await apaToken.balanceOf(buyer)
+    buyerBalance.should.be.bignumber.equal(57)
+
+    const totalSupply = await apaToken.totalSupply()
+    totalSupply.should.be.bignumber.equal(expectedTokenSupply)
   })
 });
