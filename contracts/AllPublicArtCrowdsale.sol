@@ -17,7 +17,7 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
     uint256 public constant TOTAL_SHARE = 100;
     uint256 public constant CROWDSALE_SHARE = 80;
     uint256 public constant COMPANY_SHARE = 20; // 20 % of total token supply allocated to company.
-    CompanyAllocation companyAllocation;
+    CompanyAllocation public companyAllocation;
 
     // bonus milestones
     uint256 public firstBonusSalesEnds;
@@ -103,13 +103,6 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
         TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
         forwardFunds();
-    }
-
-    // @return true if the transaction can buy tokens
-    function validPurchase() internal constant returns (bool) {
-      bool withinPeriod = now >= startTime && now <= endTime;
-      bool nonZeroPurchase = msg.value != 0;
-      return withinPeriod && nonZeroPurchase;
     }
 
     function finalization() internal {
