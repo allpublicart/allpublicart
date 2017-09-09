@@ -105,6 +105,13 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
         forwardFunds();
     }
 
+    // @return true if the transaction can buy tokens
+    function validPurchase() internal constant returns (bool) {
+      bool withinPeriod = now >= startTime && now <= endTime;
+      bool nonZeroPurchase = msg.value != 0;
+      return withinPeriod && nonZeroPurchase;
+    }
+
     function finalization() internal {
        uint256 totalSupply = token.totalSupply();
        uint256 finalSupply = TOTAL_SHARE.mul(totalSupply).div(CROWDSALE_SHARE);
