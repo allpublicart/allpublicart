@@ -3,16 +3,16 @@ pragma solidity ^0.4.13;
 import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
 import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
 import "./AllPublicArtToken.sol";
-import "./WhitelistedCrowdsale.sol";
 import "./CompanyAllocation.sol";
 
 /**
  * @title All Public Art Crowdsale contract - crowdsale contract for the APA tokens.
  * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
  */
-contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, FinalizableCrowdsale {
+contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
+    uint256 public earlyPurchaseBonus = 20;
 
     uint256 public constant TOTAL_SHARE = 100;
     uint256 public constant CROWDSALE_SHARE = 80;
@@ -27,6 +27,9 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
     // customize the rate for each whitelisted buyer
     mapping (address => uint256) public buyerRate;
 
+    // list of addresses that can purchase before crowdsale opens
+    mapping (address => bool) public whitelist;
+
     // Events
     event PreferentialUserRateChange(address indexed buyer, uint256 rate);
     event PreferentialRateChange(uint256 rate);
@@ -34,7 +37,6 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
     function AllPublicArtCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _cap, address   _wallet)
         CappedCrowdsale(_cap)
         FinalizableCrowdsale()
-        WhitelistedCrowdsale()
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
 
@@ -46,6 +48,22 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
 
     function createTokenContract() internal returns (MintableToken) {
         return new AllPublicArtToken();
+    }
+
+    function addToWhitelist(address buyer) public onlyOwner {
+        require(buyer != address(0));
+        whitelist[buyer] = true;
+    }
+
+    // @return true if buyer is whitelisted
+    function isWhitelisted(address buyer) public constant returns (bool) {
+        return whitelist[buyer];
+    }
+
+    // overriding Crowdsale#validPurchase to add whitelist logic
+    // @return true if buyers can buy at the moment
+    function validPurchase() internal constant returns (bool) {
+        return super.validPurchase() || (!hasEnded() && isWhitelisted(msg.sender));
     }
 
     function setBuyerRate(address buyer, uint256 rate) onlyOwner public {
@@ -67,40 +85,42 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
         PreferentialRateChange(rate);
     }
 
-    function getRate() internal returns(uint256) {
+    function getRate(address beneficiary) internal returns(uint256) {
         // some early buyers are offered a discount on the crowdsale price
-        if (buyerRate[msg.sender] != 0) {
-            return buyerRate[msg.sender];
+        if (buyerRate[beneficiary] != 0) {
+            return buyerRate[beneficiary];//.mul(earlyPurchaseBonus).div(100);
         }
 
         // whitelisted buyers can purchase at preferential price before crowdsale ends
-        if (isWhitelisted(msg.sender)) {
-            return preferentialRate;
+        if (isWhitelisted(beneficiary)) {
+            return preferentialRate;//.mul(earlyPurchaseBonus).div(100);
         }
 
-        // otherwise compute the price with any bonus if applicable
-        uint256 bonus = rate.mul(getBonusTier()).div(100);
-        rate = rate.add(bonus);
-
+        // otherwise it is the crowdsale rate
         return rate;
     }
 
     function buyTokens(address beneficiary) payable {
-        require(beneficiary != 0x0);
+        require(beneficiary != address(0));
         require(validPurchase());
 
         uint256 weiAmount = msg.value;
         uint256 updatedWeiRaised = weiRaised.add(weiAmount);
 
-        uint256 rate = getRate();
+        uint256 rateFetched = getRate(beneficiary);
         // calculate token amount to be created
-        uint256 tokens = weiAmount.mul(rate);
+        uint256 tokens = weiAmount.mul(rateFetched);
+
+        uint256 bonus = tokens.mul(getBonusTier(beneficiary)).div(100);
+
+        uint256 tokensIncludingBonusIfAny = tokens.add(bonus);
 
         // update state
         weiRaised = updatedWeiRaised;
 
-        token.mint(beneficiary, tokens);
-        TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
+        token.mint(beneficiary, tokensIncludingBonusIfAny);
+
+        TokenPurchase(msg.sender, beneficiary, weiAmount, tokensIncludingBonusIfAny);
 
         forwardFunds();
     }
@@ -119,19 +139,16 @@ contract AllPublicArtCrowdsale is WhitelistedCrowdsale, CappedCrowdsale, Finaliz
     /**
      * @dev Fetchs Bonus tier percentage per bonus milestones
      */
-    function getBonusTier() internal returns (uint256) {
+    function getBonusTier(address beneficiary) internal returns (uint256) {
         bool firstBonusSalesPeriod = now >= startTime && now <= firstBonusSalesEnds; // 1st week 15% bonus
         bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 2nd week 10% bonus
         bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; // 3rd week 5% bonus
         bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; // 4th week on 0 % bonus
 
+        if (buyerRate[msg.sender] != 0 || isWhitelisted(beneficiary)) return earlyPurchaseBonus;
         if (firstBonusSalesPeriod) return 15;
         if (secondBonusSalesPeriod) return 10;
         if (thirdBonusSalesPeriod) return 5;
         if (fourthBonusSalesPeriod) return 0;
-    }
-
-    function () payable {
-        buyTokens(msg.sender);
     }
 }

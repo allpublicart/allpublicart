@@ -6,7 +6,7 @@ import timer from './helpers/timer'
 
 const BigNumber = web3.BigNumber
 
-contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchaser2]) => {
+contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, purchaser2, beneficiary, sender]) => {
     const rate = new BigNumber(50)
     const cap = new BigNumber(1000)
 
@@ -45,13 +45,31 @@ contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchas
   })
 
   it('whitelists buyer rate with a preferential rate', async () => {
-      timer(20)
       await apaCrowdsale.addToWhitelist(buyer)
+      await apaCrowdsale.setPreferantialRate(preferentialRate)
+
+      const prefRate = await apaCrowdsale.preferentialRate()
+      prefRate.should.be.bignumber.equal(preferentialRate)
+
+      timer(20)
 
       await apaCrowdsale.buyTokens(buyer, { value })
-
       const balance = await apaToken.balanceOf.call(buyer)
-      balance.should.be.bignumber.equal(57)
+      balance.should.be.bignumber.equal(24)
+
+      const raised = await apaCrowdsale.weiRaised();
+      raised.should.be.bignumber.equal(value)
+  })
+
+  it('whitelists buyer rate with custom rate', async () => {
+      await apaCrowdsale.addToWhitelist(buyer)
+      await apaCrowdsale.setBuyerRate(buyer, 200)
+
+      timer(20)
+
+      await apaCrowdsale.buyTokens(buyer, { value })
+      const balance = await apaToken.balanceOf.call(buyer)
+      balance.should.be.bignumber.equal(240)
 
       const raised = await apaCrowdsale.weiRaised();
       raised.should.be.bignumber.equal(value)
@@ -74,5 +92,32 @@ contract('AllPublicArtCrowdsale', ([_, wallet, buyer, purchaser, buyer2, purchas
 
     const totalSupply = await apaToken.totalSupply()
     totalSupply.should.be.bignumber.equal(expectedTokenSupply)
+  })
+
+  describe('whitelisting', () => {
+    it('should add address to whitelist', async () => {
+      let whitelisted = await apaCrowdsale.isWhitelisted(sender)
+      whitelisted.should.equal(false)
+
+      await apaCrowdsale.addToWhitelist(sender, {from: owner})
+      whitelisted = await apaCrowdsale.isWhitelisted(sender)
+      whitelisted.should.equal(true)
+    })
+
+    it('should reject non-whitelisted sender', async () => {
+      timer(20)
+
+      try {
+          await apaCrowdsale.buyTokens(beneficiary, {value, from: sender})
+      } catch(error) {
+          ensuresException(error)
+      }
+    })
+
+    it('should sell to whitelisted address', async () => {
+      await apaCrowdsale.addToWhitelist(sender, {from: owner})
+      timer(20)
+      await apaCrowdsale.buyTokens(beneficiary, {value, from: sender}).should.be.fulfilled
+    })
   })
 });
