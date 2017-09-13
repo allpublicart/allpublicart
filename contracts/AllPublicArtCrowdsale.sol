@@ -11,7 +11,7 @@ import "./CompanyAllocation.sol";
  */
 contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     // price at which whitelisted buyers will be able to buy tokens
-    uint256 public preferentialRate;
+    uint256 public preferentialRate; // defaults to crowdsale rate
     uint256 public earlyPurchaseBonus = 20;
 
     uint256 public constant TOTAL_SHARE = 100;
@@ -34,7 +34,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     event PreferentialUserRateChange(address indexed buyer, uint256 rate);
     event PreferentialRateChange(uint256 rate);
 
-    function AllPublicArtCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _cap, address   _wallet)
+    function AllPublicArtCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _cap, uint256 _preferentialRate, address _wallet)
         CappedCrowdsale(_cap)
         FinalizableCrowdsale()
         Crowdsale(_startTime, _endTime, _rate, _wallet)
@@ -44,6 +44,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         firstBonusSalesEnds = startTime + 7 days;             // 1. end of 1st week
         secondBonusSalesEnds = firstBonusSalesEnds + 7 days; // 2. end of 2nd week
         thirdBonusSalesEnds = secondBonusSalesEnds + 7 days; // 3. end of third week
+        preferentialRate = _preferentialRate;
     }
 
     function createTokenContract() internal returns (MintableToken) {
@@ -106,21 +107,24 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
 
         uint256 weiAmount = msg.value;
         uint256 updatedWeiRaised = weiRaised.add(weiAmount);
+        uint256 bonus = getBonusTier(beneficiary);
 
-        uint256 rateFetched = getRate(beneficiary);
+        uint256 rate = getRate(beneficiary);
         // calculate token amount to be created
-        uint256 tokens = weiAmount.mul(rateFetched);
+        uint256 tokens = weiAmount.mul(rate);
 
-        uint256 bonus = tokens.mul(getBonusTier(beneficiary)).div(100);
+        if (bonus > 0) {
+            uint256 tokensIncludingBonus = tokens.mul(getBonusTier(beneficiary)).div(100);
 
-        uint256 tokensIncludingBonusIfAny = tokens.add(bonus);
+            tokens = tokens.add(tokensIncludingBonus);
+        }
 
         // update state
         weiRaised = updatedWeiRaised;
 
-        token.mint(beneficiary, tokensIncludingBonusIfAny);
+        token.mint(beneficiary, tokens);
 
-        TokenPurchase(msg.sender, beneficiary, weiAmount, tokensIncludingBonusIfAny);
+        TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
         forwardFunds();
     }
@@ -145,7 +149,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; // 3rd week 5% bonus
         bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; // 4th week on 0 % bonus
 
-        if (buyerRate[msg.sender] != 0 || isWhitelisted(beneficiary)) return earlyPurchaseBonus;
+        if (buyerRate[beneficiary] != 0 || isWhitelisted(beneficiary)) return earlyPurchaseBonus;
         if (firstBonusSalesPeriod) return 15;
         if (secondBonusSalesPeriod) return 10;
         if (thirdBonusSalesPeriod) return 5;
