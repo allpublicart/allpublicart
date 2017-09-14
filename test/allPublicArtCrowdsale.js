@@ -74,6 +74,14 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           buyerBalance.should.be.bignumber.equal(575e+17) // 15% bonus
       })
 
+      it('is also able to buy tokens with bonus by sending ether to the contract directly', async () => {
+          timer(50) // within the first seven days
+          await apaCrowdsale.sendTransaction({ from: purchaser2, value })
+
+          const purchaserBalance = await apaToken.balanceOf(purchaser2)
+          purchaserBalance.should.be.bignumber.equal(575e+17) // 15% bonus
+      })
+
       it('gives out 10% bonus during the second 7 days of the crowdsale', async () => {
           timer(dayInSecs * 8) // 8 days after start of the crowdsale - within the second seven days
           await apaCrowdsale.buyTokens(buyer2, { value })

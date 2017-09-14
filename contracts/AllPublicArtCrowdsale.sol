@@ -11,7 +11,7 @@ import "./CompanyAllocation.sol";
  */
 contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     // price at which whitelisted buyers will be able to buy tokens
-    uint256 public preferentialRate; // defaults to crowdsale rate
+    uint256 public preferentialRate;
     uint256 public earlyPurchaseBonus = 20;
 
     uint256 public constant TOTAL_SHARE = 100;
