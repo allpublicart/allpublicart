@@ -132,7 +132,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     function finalization() internal {
        uint256 totalSupply = token.totalSupply();
        uint256 finalSupply = TOTAL_SHARE.mul(totalSupply).div(CROWDSALE_SHARE);
-       companyAllocation = new CompanyAllocation();
+       companyAllocation = new CompanyAllocation(owner, token);
 
        // emit tokens for the company
        token.mint(companyAllocation, COMPANY_SHARE.mul(finalSupply).div(TOTAL_SHARE));
