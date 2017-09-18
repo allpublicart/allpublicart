@@ -48,6 +48,32 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
       crowdsaleRate.toNumber().should.equal(rate.toNumber())
   })
 
+  it('starts with token paused', async () => {
+    const paused = await apaToken.paused()
+    paused.should.equal(true)
+  })
+
+  it('owner should be able to unpause token after crowdsale ends', async function () {
+    timer(endTime + 30)
+
+    try {
+        await apaCrowdsale.unpauseToken()
+        assert.fail()
+    } catch (error) {
+        ensuresException(error)
+    }
+
+    await apaCrowdsale.finalize()
+
+    let paused = await apaToken.paused()
+    paused.should.equal(true)
+
+    await apaCrowdsale.unpauseToken()
+
+    paused = await apaToken.paused()
+    paused.should.equal(false)
+  })
+
   it('assigns tokens correctly to company when finalized', async function () {
     timer(20)
 
@@ -184,6 +210,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
           await timer(dayInSecs * 70)
           await apaCrowdsale.finalize()
+          await apaCrowdsale.unpauseToken()
 
           const companyAllocations = await apaCrowdsale.companyAllocation()
           companyAllocationsContract = CompanyAllocation.at(companyAllocations)

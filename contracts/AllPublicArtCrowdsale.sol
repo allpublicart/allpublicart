@@ -45,6 +45,8 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         secondBonusSalesEnds = firstBonusSalesEnds + 7 days; // 2. end of 2nd week
         thirdBonusSalesEnds = secondBonusSalesEnds + 7 days; // 3. end of third week
         preferentialRate = _preferentialRate;
+
+        AllPublicArtToken(token).pause();
     }
 
     function createTokenContract() internal returns (MintableToken) {
@@ -99,6 +101,16 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
 
         // otherwise it is the crowdsale rate
         return rate;
+    }
+
+    function unpauseToken() onlyOwner {
+        require(isFinalized);
+        AllPublicArtToken(token).unpause();
+    }
+
+    function pauseToken() onlyOwner {
+        require(isFinalized);
+        AllPublicArtToken(token).pause();
     }
 
     function buyTokens(address beneficiary) payable {
