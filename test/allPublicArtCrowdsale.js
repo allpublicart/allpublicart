@@ -1,12 +1,13 @@
 const AllPublicArtCrowdsale = artifacts.require("./AllPublicArtCrowdsale.sol");
 const AllPublicArtToken = artifacts.require("./AllPublicArtToken.sol");
+const CompanyAllocation = artifacts.require("./CompanyAllocation.sol");
 
 import { should, isException, ensuresException, getBlockNow } from './helpers/utils'
 import timer from './helpers/timer'
 
 const BigNumber = web3.BigNumber
 
-contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, purchaser2, beneficiary, sender]) => {
+contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, purchaser2, beneficiary, sender, founder1, founder2]) => {
     const rate = new BigNumber(50)
     const cap = new BigNumber(1000e+18)
 
@@ -19,6 +20,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
     let startTime, endTime
     let apaCrowdsale, apaToken
+    let companyAllocationsContract
 
     beforeEach('initialize contract', async () => {
         startTime = getBlockNow() + 20 // crowdsale starts in 20 seconds
@@ -173,4 +175,105 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           raised.should.be.bignumber.equal(value)
       })
   })
+
+  describe('companyAllocations', () => {
+      beforeEach(async () =>{
+          await timer(20)
+
+          await apaCrowdsale.buyTokens(buyer, {value})
+
+          await timer(dayInSecs * 70)
+          await apaCrowdsale.finalize()
+
+          const companyAllocations = await apaCrowdsale.companyAllocation()
+          companyAllocationsContract = CompanyAllocation.at(companyAllocations)
+      })
+
+      it('assigns tokens correctly CompanyAllocation contract', async function () {
+          const balance = await apaToken.balanceOf(await companyAllocationsContract.address)
+          balance.should.be.bignumber.equal(expectedCompanyTokens)
+      })
+
+      it('adds founder and their allocation', async function () {
+          await companyAllocationsContract.addCompanyAllocation(founder1, 800)
+          await companyAllocationsContract.addCompanyAllocation.sendTransaction(founder2, 1000, {from: owner})
+          const allocatedTokens = await companyAllocationsContract.allocatedTokens()
+          allocatedTokens.should.be.bignumber.equal(1800)
+
+          const allocationsForFounder1 = await companyAllocationsContract.companyAllocations.call(founder1)
+          const allocationsForFounder2 = await companyAllocationsContract.companyAllocations.call(founder2)
+          allocationsForFounder1.should.be.bignumber.equal(800)
+          allocationsForFounder2.should.be.bignumber.equal(1000)
+      })
+
+      it('does NOT unlock founders allocation before the unlock period is up', async function () {
+          await companyAllocationsContract.addCompanyAllocation(founder1, 800)
+          await companyAllocationsContract.addCompanyAllocation.sendTransaction(founder2, 1000, {from: owner})
+
+          try {
+              await companyAllocationsContract.unlock({from: founder1})
+              assert.fail()
+          } catch(e) {
+              ensuresException(e)
+          }
+
+          const tokensCreated = await companyAllocationsContract.tokensCreated()
+          tokensCreated.should.be.bignumber.equal(0)
+      })
+
+      it('unlocks founders allocation after the unlock period is up', async function () {
+          let tokensCreated
+          await companyAllocationsContract.addCompanyAllocation(founder1, 800)
+          await companyAllocationsContract.addCompanyAllocation.sendTransaction(founder2, 1000, {from: owner})
+
+          tokensCreated = await companyAllocationsContract.tokensCreated()
+          tokensCreated.should.be.bignumber.equal(0)
+
+          await timer(dayInSecs * 40)
+
+          await companyAllocationsContract.unlock({from: founder1})
+          await companyAllocationsContract.unlock({from: founder2})
+
+          const tokenBalanceFounder1 = await apaToken.balanceOf(founder1)
+          const tokenBalanceFounder2 = await apaToken.balanceOf(founder2)
+          tokenBalanceFounder1.should.be.bignumber.equal(800)
+          tokenBalanceFounder2.should.be.bignumber.equal(1000)
+      })
+
+      it('does NOT kill contract before one year is up', async function () {
+          await companyAllocationsContract.addCompanyAllocation(founder1, 800)
+          await companyAllocationsContract.addCompanyAllocation.sendTransaction(founder2, 1000, {from: owner})
+
+          try {
+              await companyAllocationsContract.kill()
+              assert.fail()
+          } catch(e) {
+              ensuresException(e)
+          }
+
+          const balance = await apaToken.balanceOf(await companyAllocationsContract.address)
+          balance.should.be.bignumber.equal(expectedCompanyTokens)
+
+          const tokensCreated = await companyAllocationsContract.tokensCreated()
+          tokensCreated.should.be.bignumber.equal(0)
+      })
+
+      it('is able to kill contract after one year', async () => {
+          await companyAllocationsContract.addCompanyAllocation.sendTransaction(founder2, 1000, {from: owner})
+
+          const tokensCreated = await companyAllocationsContract.tokensCreated()
+          tokensCreated.should.be.bignumber.equal(0)
+
+          await timer(dayInSecs * 400) // 400 days after
+
+          await companyAllocationsContract.kill()
+
+          const balance = await apaToken.balanceOf(await companyAllocationsContract.address)
+          balance.should.be.bignumber.equal(0)
+
+          const balanceOwner = await apaToken.balanceOf(owner)
+          balanceOwner.should.be.bignumber.equal(expectedCompanyTokens)
+      })
+  })
+
 });
