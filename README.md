@@ -4,10 +4,10 @@
 
 **Dependencies**
 
-- `node@6.x.x`
-- `truffle@^3.x.x`
-- `ethereumjs-testrpc@^4.x.x`
-- `zeppelin-solidity@1.2.X`
+- `node@8.5.x`
+- `truffle@^3.4.x`
+- `ethereumjs-testrpc@^4.0.x`
+- `zeppelin-solidity@1.3.X`
 
 ## Setting Up
 
