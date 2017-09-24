@@ -17,13 +17,18 @@ contract CompanyAllocation {
     AllPublicArtToken apa;
 
     /**
-    * @dev Throws if called by any account other than the owner.
-    */
+     * @dev Throws if called by any account other than the owner.
+     */
     modifier onlyOwner() {
         require(msg.sender == owner);
         _;
     }
 
+    /**
+     * @dev constructor function that sets owner and token for the CompanyAllocation contract
+     * @param _owner Contract owner
+     * @param token Token contract address for AllPublicArtToken
+     */
     function CompanyAllocation(address _owner, address token) {
         apa = AllPublicArtToken(token);
         unlockedAt = now.add(30 days);
@@ -31,7 +36,12 @@ contract CompanyAllocation {
         owner = _owner;
     }
 
-
+    /**
+     * @dev Adds founders' token allocation
+     * @param foundersAddress Address of a founder
+     * @param allocationValue Number of tokens allocated to a founder
+     * @return true if address is correctly added
+     */
     function addCompanyAllocation(address foundersAddress, uint256 allocationValue)
         external
         onlyOwner
@@ -46,8 +56,8 @@ contract CompanyAllocation {
         return true;
     }
 
-    /*
-     * @dev Allow company to unlock allocated tokens by transferring them
+    /**
+     * @dev Allow company to unlock allocated tokens by transferring them whitelisted addresses. Need to be called by each address
      */
     function unlock() external {
         assert(now >= unlockedAt);
@@ -64,8 +74,8 @@ contract CompanyAllocation {
         require(apa.transfer(msg.sender, transferAllocation));
     }
 
-    /*
-     * @dev Plan B allow for selfdestruct possibility and sending funds to owner after one year
+    /**
+     * @dev allow for selfdestruct possibility and sending funds to owner
      */
     function kill() onlyOwner() {
         assert (now >= oneYearAfterCreation);
