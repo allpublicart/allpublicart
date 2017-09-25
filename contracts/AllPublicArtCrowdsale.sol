@@ -30,6 +30,11 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     // list of addresses that can purchase before crowdsale opens
     mapping (address => bool) public whitelist;
 
+    struct OnePercent {
+        address beneficiary;
+    }
+    OnePercent public onePercent;
+
     // Events
     event PreferentialUserRateChange(address indexed buyer, uint256 rate);
     event PreferentialRateChange(uint256 rate);
@@ -185,6 +190,28 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
         forwardFunds();
+    }
+
+    /**
+     * @dev send ether to the fund collection wallets
+     */
+    function forwardFunds() internal {
+        // 1% of the purchase to save in different wallet
+        uint256 onePercentValue = msg.value.mul(1).div(100);
+        uint256 valueToTransfer = msg.value.sub(onePercentValue);
+
+        onePercent.beneficiary.transfer(onePercentValue);
+        wallet.transfer(valueToTransfer);
+    }
+
+    /**
+     * @dev Add onePercent beneficiary address to the contract
+     * @param beneficiaryAddress Aaddress in which the one percent of purchases will go to
+     */
+    function setOnePercent(address beneficiaryAddress) public onlyOwner {
+        require(beneficiaryAddress != address(0));
+        require(onePercent.beneficiary == address(0)); // only able to add once
+        onePercent.beneficiary = beneficiaryAddress;
     }
 
     /**

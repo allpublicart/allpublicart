@@ -2,7 +2,7 @@ const AllPublicArtCrowdsale = artifacts.require("./AllPublicArtCrowdsale.sol");
 const AllPublicArtToken = artifacts.require("./AllPublicArtToken.sol");
 const CompanyAllocation = artifacts.require("./CompanyAllocation.sol");
 
-import { should, isException, ensuresException, getBlockNow } from './helpers/utils'
+import { should, ensuresException, getBlockNow } from './helpers/utils'
 import timer from './helpers/timer'
 
 const BigNumber = web3.BigNumber
@@ -91,6 +91,73 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
     const totalSupply = await apaToken.totalSupply()
     totalSupply.should.be.bignumber.equal(expectedTokenSupply)
+  })
+
+  describe('forward funds', () => {
+      it('does not allow non-owners to set onePercent beneficiary', async () => {
+          timer(20)
+
+          try {
+              await apaCrowdsale.setOnePercent(buyer, {from: buyer})
+              assert.fail()
+          } catch (e) {
+              ensuresException(e)
+          }
+          const onePercent = await apaCrowdsale.onePercent.call()
+          onePercent.should.be.equal('0x0000000000000000000000000000000000000000')
+      })
+
+      it('owner is able to set onePercent', async () => {
+          timer(20)
+          await apaCrowdsale.setOnePercent(beneficiary, {from: owner})
+          const onePercent = await apaCrowdsale.onePercent.call()
+          onePercent.should.be.equal(beneficiary)
+      })
+
+      it('onePercent beneficiary is not able to be set more than once', async () => {
+          timer(20)
+          await apaCrowdsale.setOnePercent(beneficiary, {from: owner})
+
+          try {
+              await apaCrowdsale.setOnePercent(buyer, {from: owner})
+              assert.fail()
+          } catch (e) {
+              ensuresException(e)
+          }
+
+          const onePercent = await apaCrowdsale.onePercent.call()
+          onePercent.should.be.equal(beneficiary)
+      })
+
+      it('takes 1 percent of the purchase funds and assigns it to one percent beneficiary', async () => {
+          timer(20)
+          await apaCrowdsale.setOnePercent(beneficiary, {from: owner})
+          const beneficiaryBalance = web3.eth.getBalance(beneficiary)
+
+          await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
+
+          const beneficiaryNewBalance = web3.eth.getBalance(beneficiary)
+          const onePercentOfValue = value * 1 / 100
+          const calculateUpdatedBalance = beneficiaryBalance.toNumber() + onePercentOfValue
+
+          calculateUpdatedBalance.should.be.bignumber.equal(beneficiaryNewBalance)
+          beneficiaryNewBalance.should.be.bignumber.above(beneficiaryBalance)
+      })
+
+      it('assigns 99 percent of the funds to wallet', async () => {
+          timer(20)
+          const wallet = await apaCrowdsale.wallet()
+          const walletBalance = web3.eth.getBalance(wallet)
+
+          await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
+
+          const walletNewBalance = web3.eth.getBalance(wallet)
+          const ninetyNinePercentValue = value * 99 / 100
+          const calculateUpdatedBalance = walletBalance.toNumber() + ninetyNinePercentValue
+
+          calculateUpdatedBalance.should.be.bignumber.equal(walletNewBalance)
+          walletNewBalance.should.be.bignumber.above(walletBalance)
+      })
   })
 
   describe('bonus purchases', () => {
@@ -302,5 +369,4 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           balanceOwner.should.be.bignumber.equal(expectedCompanyTokens)
       })
   })
-
 });
