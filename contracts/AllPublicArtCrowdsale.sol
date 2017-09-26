@@ -177,7 +177,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         uint256 tokens = weiAmount.mul(rate);
 
         if (bonus > 0) {
-            uint256 tokensIncludingBonus = tokens.mul(getBonusTier(beneficiary)).div(100);
+            uint256 tokensIncludingBonus = tokens.mul(bonus).div(100);
 
             tokens = tokens.add(tokensIncludingBonus);
         }
