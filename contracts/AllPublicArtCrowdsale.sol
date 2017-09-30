@@ -169,7 +169,6 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         require(validPurchase());
 
         uint256 weiAmount = msg.value;
-        uint256 updatedWeiRaised = weiRaised.add(weiAmount);
         uint256 bonus = getBonusTier(beneficiary);
 
         uint256 rate = getRate(beneficiary);
@@ -183,7 +182,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         }
 
         // update state
-        weiRaised = updatedWeiRaised;
+        weiRaised = weiRaised.add(weiAmount);
 
         token.mint(beneficiary, tokens);
 
