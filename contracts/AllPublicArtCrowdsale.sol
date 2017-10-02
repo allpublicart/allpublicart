@@ -250,8 +250,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
      * @return truthy if purchase is equal or more than 10 ether
      */
      function checkMinimumPreSaleRequirement() internal returns (bool) {
-        if (msg.value >= 10 ether)
-            return true;
+        return msg.value >= 10 ether;
      }
 
     /**
