@@ -183,6 +183,9 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         require(beneficiary != address(0));
         require(validPurchase());
 
+        if (now >= startTime && now <= preSaleEnds)
+            require(checkMinimumPreSaleRequirement());
+
         uint256 weiAmount = msg.value;
         uint256 bonus = getBonusTier();
 
@@ -241,6 +244,15 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
 
        super.finalization();
     }
+
+    /**
+     * @dev checks whether it is pre sale and if there is minimum purchase requirement
+     * @return truthy if purchase is equal or more than 10 ether
+     */
+     function checkMinimumPreSaleRequirement() internal returns (bool) {
+        if (msg.value >= 10 ether)
+            return true;
+     }
 
     /**
      * @dev Fetches Bonus tier percentage per bonus milestones

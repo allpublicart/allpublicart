@@ -15,8 +15,8 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     const value = 1e+18
     const dayInSecs = 86400
 
-    const expectedCompanyTokens = new BigNumber(15e+18)
-    const expectedTokenSupply = new BigNumber(75e+18)
+    const expectedCompanyTokens = new BigNumber(125e+17)
+    const expectedTokenSupply = new BigNumber(625e+17)
 
     let startTime, endTime
     let preSaleEnds, firstBonusSalesEnds, secondBonusSalesEnds, thirdBonusSalesEnds
@@ -84,7 +84,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
   })
 
   it('assigns tokens correctly to company when finalized', async function () {
-    await timer(20)
+    await timer(dayInSecs * 42)
 
     await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
 
@@ -96,7 +96,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     balance.should.be.bignumber.equal(expectedCompanyTokens)
 
     const buyerBalance = await apaToken.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(60e+18) // 20% bonus
+    buyerBalance.should.be.bignumber.equal(50e+18)
 
     const totalSupply = await apaToken.totalSupply()
     totalSupply.should.be.bignumber.equal(expectedTokenSupply)
@@ -139,7 +139,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
       })
 
       it('takes 1 percent of the purchase funds and assigns it to one percent beneficiary', async () => {
-          timer(20)
+          await timer(dayInSecs * 42)
           await apaCrowdsale.setOnePercent(beneficiary, {from: owner})
           const beneficiaryBalance = web3.eth.getBalance(beneficiary)
 
@@ -154,7 +154,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
       })
 
       it('assigns 99 percent of the funds to wallet', async () => {
-          timer(20)
+          await timer(dayInSecs * 42)
           const wallet = await apaCrowdsale.wallet()
           const walletBalance = web3.eth.getBalance(wallet)
 
@@ -169,13 +169,26 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
       })
   })
 
-  describe('bonus purchases', () => {
-      it('has bonus of 20% during the presale', async () => {
+  describe('token purchases plus their bonuses', () => {
+      it('fails presale purchase with purchase of less than 10 ether', async () => {
           await timer(50) // within presale period
-          await apaCrowdsale.buyTokens(buyer2, { value })
+          try {
+              await apaCrowdsale.buyTokens(buyer2, { value })
+              assert.fail()
+          } catch (e) {
+              ensuresException(e)
+          }
 
           const buyerBalance = await apaToken.balanceOf(buyer2)
-          buyerBalance.should.be.bignumber.equal(60e+18) // 20% bonus
+          buyerBalance.should.be.bignumber.equal(0)
+      })
+
+      it('has bonus of 20% during the presale', async () => {
+          await timer(50) // within presale period
+          await apaCrowdsale.buyTokens(buyer2, { value: 10e+18 })
+
+          const buyerBalance = await apaToken.balanceOf(buyer2)
+          buyerBalance.should.be.bignumber.equal(600e+18) // 20% bonus
       })
 
       it('has bonus of 15% during first crowdsale bonus period', async () => {
@@ -241,7 +254,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
       it('should sell to whitelisted address', async () => {
           await apaCrowdsale.addToWhitelist(sender, {from: owner})
-          timer(20)
+          timer(dayInSecs * 42)
           await apaCrowdsale.buyTokens(beneficiary, {value, from: sender}).should.be.fulfilled
       })
 
@@ -252,11 +265,11 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           const prefRate = await apaCrowdsale.preferentialRate()
           prefRate.should.be.bignumber.equal(preferentialRate)
 
-          timer(20)
+          timer(dayInSecs * 42)
 
           await apaCrowdsale.buyTokens(buyer, { value })
           const balance = await apaToken.balanceOf.call(buyer)
-          balance.should.be.bignumber.equal(120e+18)
+          balance.should.be.bignumber.equal(100e+18)
 
           const raised = await apaCrowdsale.weiRaised();
           raised.should.be.bignumber.equal(value)
@@ -266,11 +279,11 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           await apaCrowdsale.addToWhitelist(buyer)
           await apaCrowdsale.setBuyerRate(buyer, 200e+18)
 
-          timer(20)
+          timer(dayInSecs * 42)
 
           await apaCrowdsale.buyTokens(buyer, { value })
           const balance = await apaToken.balanceOf.call(buyer)
-          balance.should.be.bignumber.equal(2.4e+38)
+          balance.should.be.bignumber.equal(2e+38)
 
           const raised = await apaCrowdsale.weiRaised();
           raised.should.be.bignumber.equal(value)
@@ -279,7 +292,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
   describe('companyAllocations', () => {
       beforeEach(async () =>{
-          await timer(20)
+          timer(dayInSecs * 42)
 
           await apaCrowdsale.buyTokens(buyer, {value})
 
