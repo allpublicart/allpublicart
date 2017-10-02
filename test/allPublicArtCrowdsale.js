@@ -217,15 +217,6 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           const buyerBalance = await apaToken.balanceOf(buyer2)
           buyerBalance.should.be.bignumber.equal(50e+18) // 0% bonus
       })
-
-      it('whitelist addresses gets 20% bonus', async () => {
-          await apaCrowdsale.addToWhitelist(buyer2)
-          timer(dayInSecs * 22) // does not matter which point in time the crowdsale is
-          await apaCrowdsale.buyTokens(buyer2, { value })
-
-          const buyerBalance = await apaToken.balanceOf(buyer2)
-          buyerBalance.should.be.bignumber.equal(120e+18) // 0% bonus
-      })
   })
 
   describe('whitelisting', () => {

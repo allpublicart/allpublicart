@@ -12,7 +12,6 @@ import "./CompanyAllocation.sol";
 contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
-    uint256 public earlyPurchaseBonus = 20;
 
     uint256 public constant TOTAL_SHARE = 100;
     uint256 public constant CROWDSALE_SHARE = 80;
@@ -87,7 +86,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     }
 
     /**
-     * @dev Add whitelist addresses that can participate in the pre and crowdsale with earlyPurchaseBonus rate
+     * @dev Add whitelist addresses that can participate in the pre and crowdsale with a preferential rate
      * @param buyer Purchaser's address to be whitelisted
      */
     function addToWhitelist(address buyer) public onlyOwner {
@@ -185,7 +184,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
         require(validPurchase());
 
         uint256 weiAmount = msg.value;
-        uint256 bonus = getBonusTier(beneficiary);
+        uint256 bonus = getBonusTier();
 
         uint256 rate = getRate(beneficiary);
         // calculate token amount to be created
@@ -245,17 +244,15 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
 
     /**
      * @dev Fetches Bonus tier percentage per bonus milestones
-     * @param beneficiary Address of the purchaser
      * @return uint256 representing percentage of the bonus tier
      */
-    function getBonusTier(address beneficiary) internal returns (uint256) {
+    function getBonusTier() internal returns (uint256) {
         bool preSalePeriod = now >= startTime && now <= preSaleEnds; //  20% bonus
         bool firstBonusSalesPeriod = now >= preSaleEnds && now <= firstBonusSalesEnds; // 15% bonus
         bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 10% bonus
         bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; //  5% bonus
         bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; //  0 % bonus
 
-        if (buyerRate[beneficiary] != 0 || isWhitelisted(beneficiary)) return earlyPurchaseBonus;
         if (preSalePeriod) return 20;
         if (firstBonusSalesPeriod) return 15;
         if (secondBonusSalesPeriod) return 10;
