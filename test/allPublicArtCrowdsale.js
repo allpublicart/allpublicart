@@ -15,19 +15,28 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     const value = 1e+18
     const dayInSecs = 86400
 
-    const expectedCompanyTokens = new BigNumber(14375e+15)
-    const expectedTokenSupply = new BigNumber(71875e+15)
+    const expectedCompanyTokens = new BigNumber(15e+18)
+    const expectedTokenSupply = new BigNumber(75e+18)
 
     let startTime, endTime
+    let preSaleEnds, firstBonusSalesEnds, secondBonusSalesEnds, thirdBonusSalesEnds
     let apaCrowdsale, apaToken
     let companyAllocationsContract
 
     beforeEach('initialize contract', async () => {
         startTime = getBlockNow() + 20 // crowdsale starts in 20 seconds
+        preSaleEnds = getBlockNow() + dayInSecs * 10 // 10 days
+        firstBonusSalesEnds = getBlockNow() + dayInSecs * 20 // 20 days
+        secondBonusSalesEnds = getBlockNow() + dayInSecs * 30 // 30 days
+        thirdBonusSalesEnds = getBlockNow() + dayInSecs * 40 // 40 days
         endTime = getBlockNow() + dayInSecs * 60 // 60 days
 
         apaCrowdsale = await AllPublicArtCrowdsale.new(
             startTime,
+            preSaleEnds,
+            firstBonusSalesEnds,
+            secondBonusSalesEnds,
+            thirdBonusSalesEnds,
             endTime,
             rate,
             cap,
@@ -75,11 +84,11 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
   })
 
   it('assigns tokens correctly to company when finalized', async function () {
-    timer(20)
+    await timer(20)
 
     await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
 
-    timer(endTime + 30)
+    await timer(endTime + 30)
     await apaCrowdsale.finalize()
 
     const companyAllocation = await apaCrowdsale.companyAllocation()
@@ -87,7 +96,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     balance.should.be.bignumber.equal(expectedCompanyTokens)
 
     const buyerBalance = await apaToken.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(575e+17) // 15% bonus
+    buyerBalance.should.be.bignumber.equal(60e+18) // 20% bonus
 
     const totalSupply = await apaToken.totalSupply()
     totalSupply.should.be.bignumber.equal(expectedTokenSupply)
@@ -161,8 +170,16 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
   })
 
   describe('bonus purchases', () => {
-      it('has bonus of 15% during the first 7 days of the crowdsale', async () => {
-          timer(50) // within the first seven days
+      it('has bonus of 20% during the presale', async () => {
+          await timer(50) // within presale period
+          await apaCrowdsale.buyTokens(buyer2, { value })
+
+          const buyerBalance = await apaToken.balanceOf(buyer2)
+          buyerBalance.should.be.bignumber.equal(60e+18) // 20% bonus
+      })
+
+      it('has bonus of 15% during first crowdsale bonus period', async () => {
+          await timer(dayInSecs * 12)
           await apaCrowdsale.buyTokens(buyer2, { value })
 
           const buyerBalance = await apaToken.balanceOf(buyer2)
@@ -170,31 +187,31 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
       })
 
       it('is also able to buy tokens with bonus by sending ether to the contract directly', async () => {
-          timer(50) // within the first seven days
+          await timer(dayInSecs * 12)
           await apaCrowdsale.sendTransaction({ from: purchaser2, value })
 
           const purchaserBalance = await apaToken.balanceOf(purchaser2)
           purchaserBalance.should.be.bignumber.equal(575e+17) // 15% bonus
       })
 
-      it('gives out 10% bonus during the second 7 days of the crowdsale', async () => {
-          timer(dayInSecs * 8) // 8 days after start of the crowdsale - within the second seven days
+      it('gives out 10% bonus during second crowdsale bonus period', async () => {
+          await timer(dayInSecs * 22)
           await apaCrowdsale.buyTokens(buyer2, { value })
 
           const buyerBalance = await apaToken.balanceOf(buyer2)
           buyerBalance.should.be.bignumber.equal(55e+18) // 10% bonus
       })
 
-      it('provides 5% bonus during the third 7 days of the crowdsale', async () => {
-          timer(dayInSecs * 15) // 15 days after start of the crowdsale - within the third seven days
+      it('provides 5% bonus during third crowdsale bonus period', async () => {
+          timer(dayInSecs * 32)
           await apaCrowdsale.buyTokens(buyer2, { value })
 
           const buyerBalance = await apaToken.balanceOf(buyer2)
           buyerBalance.should.be.bignumber.equal(525e+17) // 5% bonus
       })
 
-      it('provides 0% bonus after the third 7 days of the crowdsale ends', async () => {
-          timer(dayInSecs * 22) // 21 days after start of the crowdsale - no bonus given
+      it('provides 0% bonus after third crowdsale bonus period', async () => {
+          timer(dayInSecs * 42)
           await apaCrowdsale.buyTokens(buyer2, { value })
 
           const buyerBalance = await apaToken.balanceOf(buyer2)

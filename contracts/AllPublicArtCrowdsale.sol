@@ -20,6 +20,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     CompanyAllocation public companyAllocation;
 
     // bonus milestones
+    uint256 public preSaleEnds;
     uint256 public firstBonusSalesEnds;
     uint256 public secondBonusSalesEnds;
     uint256 public thirdBonusSalesEnds;
@@ -48,16 +49,31 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
      * @param _preferentialRate Rate for whitelisted pre sale purchasers
      * @param _wallet Multisig wallet that will hold the crowdsale funds.
      */
-    function AllPublicArtCrowdsale(uint256 _startTime, uint256 _endTime, uint256 _rate, uint256 _cap, uint256 _preferentialRate, address _wallet)
+    function AllPublicArtCrowdsale
+        (
+            uint256 _startTime,
+            uint256 _preSaleEnds,
+            uint256 _firstBonusSalesEnds,
+            uint256 _secondBonusSalesEnds,
+            uint256 _thirdBonusSalesEnds,
+            uint256 _endTime,
+            uint256 _rate,
+            uint256 _cap,
+            uint256 _preferentialRate,
+            address _wallet
+        )
+
         CappedCrowdsale(_cap)
         FinalizableCrowdsale()
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
 
         // setup for token bonus milestones
-        firstBonusSalesEnds = startTime + 7 days;             // 1. end of 1st week
-        secondBonusSalesEnds = firstBonusSalesEnds + 7 days; // 2. end of 2nd week
-        thirdBonusSalesEnds = secondBonusSalesEnds + 7 days; // 3. end of third week
+        preSaleEnds = _preSaleEnds;
+        firstBonusSalesEnds = _firstBonusSalesEnds;
+        secondBonusSalesEnds = _secondBonusSalesEnds;
+        thirdBonusSalesEnds = _thirdBonusSalesEnds;
+
         preferentialRate = _preferentialRate;
 
         AllPublicArtToken(token).pause();
@@ -132,12 +148,12 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     function getRate(address beneficiary) internal returns(uint256) {
         // some early buyers are offered a discount on the crowdsale price
         if (buyerRate[beneficiary] != 0) {
-            return buyerRate[beneficiary];//.mul(earlyPurchaseBonus).div(100);
+            return buyerRate[beneficiary];
         }
 
         // whitelisted buyers can purchase at preferential price before crowdsale ends
         if (isWhitelisted(beneficiary)) {
-            return preferentialRate;//.mul(earlyPurchaseBonus).div(100);
+            return preferentialRate;
         }
 
         // otherwise it is the crowdsale rate
@@ -233,12 +249,14 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
      * @return uint256 representing percentage of the bonus tier
      */
     function getBonusTier(address beneficiary) internal returns (uint256) {
-        bool firstBonusSalesPeriod = now >= startTime && now <= firstBonusSalesEnds; // 1st week 15% bonus
-        bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 2nd week 10% bonus
-        bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; // 3rd week 5% bonus
-        bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; // 4th week on 0 % bonus
+        bool preSalePeriod = now >= startTime && now <= preSaleEnds; //  20% bonus
+        bool firstBonusSalesPeriod = now >= preSaleEnds && now <= firstBonusSalesEnds; // 15% bonus
+        bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 10% bonus
+        bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; //  5% bonus
+        bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; //  0 % bonus
 
         if (buyerRate[beneficiary] != 0 || isWhitelisted(beneficiary)) return earlyPurchaseBonus;
+        if (preSalePeriod) return 20;
         if (firstBonusSalesPeriod) return 15;
         if (secondBonusSalesPeriod) return 10;
         if (thirdBonusSalesPeriod) return 5;
