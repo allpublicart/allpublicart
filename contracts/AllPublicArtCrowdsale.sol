@@ -13,9 +13,8 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
 
-    uint256 public constant TOTAL_SHARE = 100;
-    uint256 public constant CROWDSALE_SHARE = 80;
-    uint256 public constant COMPANY_SHARE = 20; // 20 % of total token supply allocated to company.
+    uint256 constant public totalSupplyCrowdsale = 350000000e18;
+    uint256 public constant COMPANY_SHARE = 650000000e18; // 650M tokens allocated to company
     CompanyAllocation public companyAllocation;
 
     // bonus milestones
@@ -236,11 +235,16 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
      */
     function finalization() internal {
        uint256 totalSupply = token.totalSupply();
-       uint256 finalSupply = TOTAL_SHARE.mul(totalSupply).div(CROWDSALE_SHARE);
        companyAllocation = new CompanyAllocation(owner, token);
 
        // emit tokens for the company
-       token.mint(companyAllocation, COMPANY_SHARE.mul(finalSupply).div(TOTAL_SHARE));
+       token.mint(companyAllocation, COMPANY_SHARE);
+
+       if (totalSupply < totalSupplyCrowdsale) {
+           uint256 remainingTokens = totalSupplyCrowdsale.sub(totalSupply);
+
+           token.mint(companyAllocation, remainingTokens);
+       }
 
        super.finalization();
     }

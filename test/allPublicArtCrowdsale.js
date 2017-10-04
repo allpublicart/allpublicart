@@ -9,21 +9,22 @@ const BigNumber = web3.BigNumber
 
 contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, purchaser2, beneficiary, sender, founder1, founder2]) => {
     const rate = new BigNumber(50)
+    const newRate =  new BigNumber(350000000); // 350M APA tokens per 1 eth
     const cap = new BigNumber(1000e+18)
 
     const preferentialRate = new BigNumber(100)
     const value = 1e+18
     const dayInSecs = 86400
 
-    const expectedCompanyTokens = new BigNumber(125e+17)
-    const expectedTokenSupply = new BigNumber(625e+17)
+    const expectedCompanyTokens = new BigNumber(650000000e+18)
+    const expectedTokenSupply = new BigNumber(1000000000e+18)
 
     let startTime, endTime
     let preSaleEnds, firstBonusSalesEnds, secondBonusSalesEnds, thirdBonusSalesEnds
     let apaCrowdsale, apaToken
     let companyAllocationsContract
 
-    beforeEach('initialize contract', async () => {
+    const newCrowdsale = (rate) => {
         startTime = getBlockNow() + 20 // crowdsale starts in 20 seconds
         preSaleEnds = getBlockNow() + dayInSecs * 10 // 10 days
         firstBonusSalesEnds = getBlockNow() + dayInSecs * 20 // 20 days
@@ -31,7 +32,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
         thirdBonusSalesEnds = getBlockNow() + dayInSecs * 40 // 40 days
         endTime = getBlockNow() + dayInSecs * 60 // 60 days
 
-        apaCrowdsale = await AllPublicArtCrowdsale.new(
+        return AllPublicArtCrowdsale.new(
             startTime,
             preSaleEnds,
             firstBonusSalesEnds,
@@ -43,9 +44,12 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
             preferentialRate,
             wallet
         )
+    }
 
-        apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
-    })
+  beforeEach('initialize contract', async () => {
+    apaCrowdsale = await newCrowdsale(rate)
+    apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+  })
 
   it('has a cap', async () => {
       const crowdsaleCap = await apaCrowdsale.cap()
@@ -84,6 +88,10 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
   })
 
   it('assigns tokens correctly to company when finalized', async function () {
+    const newRate =  new BigNumber(350000000); // 350M APA tokens per 1 eth
+    apaCrowdsale = await newCrowdsale(newRate)
+    apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+
     await timer(dayInSecs * 42)
 
     await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
@@ -96,7 +104,30 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     balance.should.be.bignumber.equal(expectedCompanyTokens)
 
     const buyerBalance = await apaToken.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(50e+18)
+    buyerBalance.should.be.bignumber.equal(350000000e+18)
+
+    const totalSupply = await apaToken.totalSupply()
+    totalSupply.should.be.bignumber.equal(expectedTokenSupply)
+  })
+
+  it('assigns remaining tokens to company if not all tokens are sold during crowdsale', async function () {
+    const fictiousRate =  new BigNumber(300000000); // 350M APA tokens per 1 eth
+    apaCrowdsale = await newCrowdsale(fictiousRate)
+    apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+
+    await timer(dayInSecs * 42)
+
+    await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
+
+    await timer(endTime + 30)
+    await apaCrowdsale.finalize()
+
+    const companyAllocation = await apaCrowdsale.companyAllocation()
+    const balance = await apaToken.balanceOf(companyAllocation)
+    balance.should.be.bignumber.equal(700000000e+18)
+
+    const buyerBalance = await apaToken.balanceOf(buyer)
+    buyerBalance.should.be.bignumber.equal(300000000e+18)
 
     const totalSupply = await apaToken.totalSupply()
     totalSupply.should.be.bignumber.equal(expectedTokenSupply)
@@ -292,6 +323,9 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
   describe('companyAllocations', () => {
       beforeEach(async () =>{
+          apaCrowdsale = await newCrowdsale(newRate)
+          apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+
           timer(dayInSecs * 42)
 
           await apaCrowdsale.buyTokens(buyer, {value})
