@@ -214,6 +214,28 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           buyerBalance.should.be.bignumber.equal(0)
       })
 
+      it('does NOT buy tokens if crowdsale is paused', async () => {
+          await timer(dayInSecs * 40)
+          await apaCrowdsale.pause()
+          let buyerBalance
+
+          try {
+              await apaCrowdsale.buyTokens(buyer, { value })
+              assert.fail()
+          } catch(e) {
+              ensuresException(e)
+          }
+
+          buyerBalance = await apaToken.balanceOf(buyer)
+          buyerBalance.should.be.bignumber.equal(0)
+
+          await apaCrowdsale.unpause()
+          await apaCrowdsale.buyTokens(buyer, { value })
+
+          buyerBalance = await apaToken.balanceOf(buyer)
+          buyerBalance.should.be.bignumber.equal(50e+18)
+      })
+
       it('has bonus of 20% during the presale', async () => {
           await timer(50) // within presale period
           await apaCrowdsale.buyTokens(buyer2, { value: 10e+18 })
@@ -322,7 +344,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
   })
 
   describe('companyAllocations', () => {
-      beforeEach(async () =>{
+      beforeEach(async () => {
           apaCrowdsale = await newCrowdsale(newRate)
           apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
 

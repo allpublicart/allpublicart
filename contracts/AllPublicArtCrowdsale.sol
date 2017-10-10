@@ -2,6 +2,7 @@ pragma solidity ^0.4.13;
 
 import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
 import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
+import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "./AllPublicArtToken.sol";
 import "./CompanyAllocation.sol";
 
@@ -9,7 +10,7 @@ import "./CompanyAllocation.sol";
  * @title All Public Art Crowdsale contract - crowdsale contract for the APA tokens.
  * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
  */
-contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
+contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausable {
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
 
@@ -178,7 +179,11 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale {
      * @dev payable function that allow token purchases
      * @param beneficiary Address of the purchaser
      */
-    function buyTokens(address beneficiary) payable {
+    function buyTokens(address beneficiary)
+        public
+        whenNotPaused
+        payable
+    {
         require(beneficiary != address(0));
         require(validPurchase());
 
