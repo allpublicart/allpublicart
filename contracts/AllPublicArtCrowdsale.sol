@@ -14,8 +14,8 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
 
-    uint256 constant public totalSupplyCrowdsale = 350000000e18;
-    uint256 public constant COMPANY_SHARE = 650000000e18; // 650M tokens allocated to company
+    uint256 constant public totalSupplyCrowdsale = 375000000e18;
+    uint256 public constant COMPANY_SHARE = 625000000e18; // 650M tokens allocated to company
     CompanyAllocation public companyAllocation;
 
     // bonus milestones
@@ -30,10 +30,10 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
     // list of addresses that can purchase before crowdsale opens
     mapping (address => bool) public whitelist;
 
-    struct OnePercent {
+    struct TwoPercent {
         address beneficiary;
     }
-    OnePercent public onePercent;
+    TwoPercent public twoPercent;
 
     // Events
     event PreferentialUserRateChange(address indexed buyer, uint256 rate);
@@ -187,9 +187,6 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
         require(beneficiary != address(0));
         require(validPurchase());
 
-        if (now >= startTime && now <= preSaleEnds)
-            require(checkMinimumPreSaleRequirement());
-
         uint256 weiAmount = msg.value;
         uint256 bonus = getBonusTier();
 
@@ -217,22 +214,22 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
      * @dev send ether to the fund collection wallets
      */
     function forwardFunds() internal {
-        // 1% of the purchase to save in different wallet
-        uint256 onePercentValue = msg.value.mul(1).div(100);
-        uint256 valueToTransfer = msg.value.sub(onePercentValue);
+        // 2% of the purchase to save in different wallet
+        uint256 twoPercentValue = msg.value.mul(2).div(100);
+        uint256 valueToTransfer = msg.value.sub(twoPercentValue);
 
-        onePercent.beneficiary.transfer(onePercentValue);
+        twoPercent.beneficiary.transfer(twoPercentValue);
         wallet.transfer(valueToTransfer);
     }
 
     /**
-     * @dev Add onePercent beneficiary address to the contract
+     * @dev Add twoPercent beneficiary address to the contract
      * @param beneficiaryAddress Aaddress in which the one percent of purchases will go to
      */
-    function setOnePercent(address beneficiaryAddress) public onlyOwner {
+    function setTwoPercent(address beneficiaryAddress) public onlyOwner {
         require(beneficiaryAddress != address(0));
-        require(onePercent.beneficiary == address(0)); // only able to add once
-        onePercent.beneficiary = beneficiaryAddress;
+        require(twoPercent.beneficiary == address(0)); // only able to add once
+        twoPercent.beneficiary = beneficiaryAddress;
     }
 
     /**
@@ -255,11 +252,25 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
     }
 
     /**
-     * @dev checks whether it is pre sale and if there is minimum purchase requirement
-     * @return truthy if purchase is equal or more than 10 ether
+     * @dev calculates pre sale bonus tier
+     * @return bonus percentage as uint
      */
-     function checkMinimumPreSaleRequirement() internal returns (bool) {
-        return msg.value >= 10 ether;
+     function calculatePreSaleBonus() internal returns (uint256) {
+         /*
+            0-35 ether                  20%
+            35+ ETH ($10.5k)            25%
+            100+ ETH ($30k)             30%
+            500+ ETH ($150k)            35%
+            1000+ ETH ($300k)           40%
+         */
+         if (msg.value < 35 ether)
+            return 20;
+         if (msg.value >= 35 ether && msg.value < 100 ether)
+            return 25;
+         if (msg.value >= 100 ether && msg.value < 500 ether)
+            return 30;
+         if (msg.value >= 500 ether && msg.value < 1000 ether)
+            return 40;
      }
 
     /**
@@ -273,10 +284,11 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
         bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; //  5% bonus
         bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; //  0 % bonus
 
-        if (preSalePeriod) return 20;
-        if (firstBonusSalesPeriod) return 15;
-        if (secondBonusSalesPeriod) return 10;
-        if (thirdBonusSalesPeriod) return 5;
+        if (preSalePeriod)
+            return calculatePreSaleBonus();
+        if (firstBonusSalesPeriod) return 20;
+        if (secondBonusSalesPeriod) return 15;
+        if (thirdBonusSalesPeriod) return 10;
         if (fourthBonusSalesPeriod) return 0;
     }
 }

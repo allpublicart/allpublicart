@@ -31,8 +31,8 @@ contract CompanyAllocation {
      */
     function CompanyAllocation(address _owner, address token) {
         apa = AllPublicArtToken(token);
-        unlockedAt = now.add(30 days);
-        oneYearAfterCreation = now.add(365 days);
+        unlockedAt = now.add(365 days);
+        oneYearAfterCreation = now.add(600 days);
         owner = _owner;
     }
 
