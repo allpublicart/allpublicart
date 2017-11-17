@@ -47,7 +47,6 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
      * @param _startTime The timestamp of the beginning of the crowdsale
      * @param _endTime Timestamp when the crowdsale will finish
      * @param _rate The token rate per ETH
-     * @param _cap Crowdsale cap
      * @param _preferentialRate Rate for whitelisted pre sale purchasers
      * @param _wallet Multisig wallet that will hold the crowdsale funds.
      */
@@ -60,7 +59,6 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
             uint256 _thirdBonusSalesEnds,
             uint256 _endTime,
             uint256 _rate,
-            uint256 _cap,
             uint256 _preferentialRate,
             address _wallet
         )

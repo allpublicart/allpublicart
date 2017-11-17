@@ -10,7 +10,6 @@ const BigNumber = web3.BigNumber
 contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, purchaser2, beneficiary, sender, founder1, founder2]) => {
     const rate = new BigNumber(50)
     const newRate =  new BigNumber(400000000); // 375M APA tokens per 1 eth
-    const cap = new BigNumber(1000e+18)
 
     const preferentialRate = new BigNumber(100)
     const value = 1e+18
@@ -40,7 +39,6 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
             thirdBonusSalesEnds,
             endTime,
             rate,
-            cap,
             preferentialRate,
             wallet
         )

@@ -10,7 +10,6 @@ const secondBonusSalesEnds = startTime + dayInSecs * 30 // 30 days
 const thirdBonusSalesEnds = startTime + dayInSecs * 40 // 40 days
 const endTime = startTime + (dayInSecs * 60) // 60 days
 const rate = new BigNumber(500)
-const cap = new BigNumber(1000)
 const preferentialRate = new BigNumber(100)
 
 module.exports = function(deployer, network, [_, wallet]) {
@@ -24,7 +23,6 @@ module.exports = function(deployer, network, [_, wallet]) {
       thirdBonusSalesEnds,
       endTime,
       rate,
-      cap,
       preferentialRate,
       wallet
   );
