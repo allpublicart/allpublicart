@@ -7,10 +7,10 @@ contract CompanyAllocation {
     using SafeMath for uint;
     address public owner;
     uint256 public unlockedAt;
-    uint256 public oneYearAfterCreation;
-    uint256 public tokensCreated = 0;
-    uint256 public allocatedTokens = 0;
-    uint256 totalCompanyAllocation = 2000000e18;
+    uint256 public canSelfDestruct;
+    uint256 public tokensCreated;
+    uint256 public allocatedTokens;
+    uint256 totalCompanyAllocation = 625000000e18;
 
     mapping (address => uint256) public companyAllocations;
 
@@ -32,7 +32,7 @@ contract CompanyAllocation {
     function CompanyAllocation(address _owner, address token) {
         apa = AllPublicArtToken(token);
         unlockedAt = now.add(365 days);
-        oneYearAfterCreation = now.add(600 days);
+        canSelfDestruct = now.add(600 days);
         owner = _owner;
     }
 
@@ -78,7 +78,7 @@ contract CompanyAllocation {
      * @dev allow for selfdestruct possibility and sending funds to owner
      */
     function kill() onlyOwner() {
-        assert (now >= oneYearAfterCreation);
+        assert (now >= canSelfDestruct);
         uint256 balance = apa.balanceOf(this);
 
         if (balance > 0) {

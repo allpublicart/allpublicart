@@ -1,6 +1,5 @@
 pragma solidity ^0.4.13;
 
-import "zeppelin-solidity/contracts/crowdsale/CappedCrowdsale.sol";
 import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "./AllPublicArtToken.sol";
@@ -10,12 +9,12 @@ import "./CompanyAllocation.sol";
  * @title All Public Art Crowdsale contract - crowdsale contract for the APA tokens.
  * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
  */
-contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausable {
+contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     // price at which whitelisted buyers will be able to buy tokens
     uint256 public preferentialRate;
 
-    uint256 constant public totalSupplyCrowdsale = 375000000e18;
-    uint256 public constant COMPANY_SHARE = 625000000e18; // 650M tokens allocated to company
+    uint256 constant public totalSupplyCrowdsale = 400000000e18;
+    uint256 public constant COMPANY_SHARE = 600000000e18; // 650M tokens allocated to company
     CompanyAllocation public companyAllocation;
 
     // bonus milestones
@@ -29,14 +28,18 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
 
     // list of addresses that can purchase before crowdsale opens
     mapping (address => bool) public whitelist;
+    // list of artist addresses that can purchase during the presale without a minimum amount
+    mapping (address => bool) public artistWhitelist;
 
     struct TwoPercent {
         address beneficiary;
     }
+
     TwoPercent public twoPercent;
 
     // Events
     event PreferentialUserRateChange(address indexed buyer, uint256 rate);
+    event PrivateInvestorTokenPurchase(address indexed investor, uint256 rate, uint256 bonus, uint weiAmount);
     event PreferentialRateChange(uint256 rate);
 
     /**
@@ -62,7 +65,6 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
             address _wallet
         )
 
-        CappedCrowdsale(_cap)
         FinalizableCrowdsale()
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
@@ -94,6 +96,38 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
         whitelist[buyer] = true;
     }
 
+    // NOTE: write test for this.
+    /**
+     * @dev Mint tokens for private investors before crowdsale starts
+     * @param investorsAddress Purchaser's address
+     * @param rate Rate of the purchase
+     * @param bonus Number that represents the bonus
+     * @param weiAmount Amount that the investors sent during the private sale period
+     */
+    function mintTokenForPrivateInvestors(address investorsAddress, uint256 rate, uint256 bonus, uint256 weiAmount)
+        external
+        onlyOwner
+    {
+        require(now <= startTime);
+
+        uint256 tokens = rate.mul(weiAmount);
+        uint256 tokenBonus = tokens.mul(bonus).div(100);
+        tokens = tokens.add(tokenBonus);
+
+        token.mint(investorsAddress, tokens);
+        PrivateInvestorTokenPurchase(investorsAddress, rate, bonus, weiAmount);
+    }
+
+
+    /**
+     * @dev Add artists addresses as a whitelist mechanism
+     * @param artist Artist's address to be whitelisted
+     */
+    function whitelistArtist(address artist) public onlyOwner {
+        require(artist != address(0));
+        artistWhitelist[artist] = true;
+    }
+
     /**
      * @dev checks whether address is whitelisted
      * @param buyer Purchaser's address to check
@@ -101,6 +135,15 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
      */
     function isWhitelisted(address buyer) public constant returns (bool) {
         return whitelist[buyer];
+    }
+
+    /**
+     * @dev checks whether artist address is whitelisted
+     * @param artist Artist's address to check
+     * @return true if artist is whitelisted
+     */
+    function checkForWhitelistedArtist(address artist) public constant returns (bool) {
+        return artistWhitelist[artist];
     }
 
     /**
@@ -119,7 +162,6 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
     function setBuyerRate(address buyer, uint256 rate) onlyOwner public {
         require(rate != 0);
         require(isWhitelisted(buyer));
-        require(now < startTime);
 
         buyerRate[buyer] = rate;
 
@@ -132,7 +174,6 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
      */
     function setPreferantialRate(uint256 rate) onlyOwner public {
         require(rate != 0);
-        require(now < startTime);
 
         preferentialRate = rate;
 
@@ -160,22 +201,6 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
     }
 
     /**
-     * @dev triggers token transfer mechanism. To be used after the crowdsale is finished
-     */
-    function unpauseToken() onlyOwner {
-        require(isFinalized);
-        AllPublicArtToken(token).unpause();
-    }
-
-    /**
-     * @dev Pauses token transfers. Only used after crowdsale finishes
-     */
-    function pauseToken() onlyOwner {
-        require(isFinalized);
-        AllPublicArtToken(token).pause();
-    }
-
-    /**
      * @dev payable function that allow token purchases
      * @param beneficiary Address of the purchaser
      */
@@ -185,7 +210,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
         payable
     {
         require(beneficiary != address(0));
-        require(validPurchase());
+        require(validPurchase() && token.totalSupply() <= totalSupplyCrowdsale);
 
         uint256 weiAmount = msg.value;
         uint256 bonus = getBonusTier();
@@ -248,6 +273,7 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
            token.mint(companyAllocation, remainingTokens);
        }
 
+       AllPublicArtToken(token).unpause();
        super.finalization();
     }
 
@@ -257,12 +283,13 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
      */
      function calculatePreSaleBonus() internal returns (uint256) {
          /*
-            0-35 ether                  20%
+            0-35 no minimum for Artists 20%
             35+ ETH ($10.5k)            25%
             100+ ETH ($30k)             30%
-            500+ ETH ($150k)            35%
-            1000+ ETH ($300k)           40%
+            500+ ETH ($150k)            40%
+            1000+ ETH ($300k)           45%
          */
+
          if (msg.value < 35 ether)
             return 20;
          if (msg.value >= 35 ether && msg.value < 100 ether)
@@ -271,6 +298,8 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
             return 30;
          if (msg.value >= 500 ether && msg.value < 1000 ether)
             return 40;
+         if (msg.value >= 1000 ether)
+            return 45;
      }
 
     /**
@@ -278,10 +307,10 @@ contract AllPublicArtCrowdsale is CappedCrowdsale, FinalizableCrowdsale, Pausabl
      * @return uint256 representing percentage of the bonus tier
      */
     function getBonusTier() internal returns (uint256) {
-        bool preSalePeriod = now >= startTime && now <= preSaleEnds; //  20% bonus
-        bool firstBonusSalesPeriod = now >= preSaleEnds && now <= firstBonusSalesEnds; // 15% bonus
-        bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 10% bonus
-        bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; //  5% bonus
+        bool preSalePeriod = now >= startTime && now <= preSaleEnds;
+        bool firstBonusSalesPeriod = now > preSaleEnds && now <= firstBonusSalesEnds; // 20% bonus
+        bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 15% bonus
+        bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; //  10% bonus
         bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; //  0 % bonus
 
         if (preSalePeriod)

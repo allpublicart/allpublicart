@@ -9,14 +9,14 @@ const BigNumber = web3.BigNumber
 
 contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, purchaser2, beneficiary, sender, founder1, founder2]) => {
     const rate = new BigNumber(50)
-    const newRate =  new BigNumber(375000000); // 375M APA tokens per 1 eth
+    const newRate =  new BigNumber(400000000); // 375M APA tokens per 1 eth
     const cap = new BigNumber(1000e+18)
 
     const preferentialRate = new BigNumber(100)
     const value = 1e+18
     const dayInSecs = 86400
 
-    const expectedCompanyTokens = new BigNumber(625000000e+18)
+    const expectedCompanyTokens = new BigNumber(600000000e+18)
     const expectedTokenSupply = new BigNumber(1000000000e+18)
 
     let startTime, endTime
@@ -51,10 +51,6 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
   })
 
-  it('has a cap', async () => {
-      const crowdsaleCap = await apaCrowdsale.cap()
-      crowdsaleCap.toNumber().should.equal(cap.toNumber())
-  });
 
   it('has a normal crowdsale rate', async () => {
       const crowdsaleRate = await apaCrowdsale.rate()
@@ -66,25 +62,16 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     paused.should.equal(true)
   })
 
-  it('owner should be able to unpause token after crowdsale ends', async function () {
+  it('token is unpaused after crowdsale ends', async function () {
     timer(endTime + 30)
 
-    try {
-        await apaCrowdsale.unpauseToken()
-        assert.fail()
-    } catch (error) {
-        ensuresException(error)
-    }
+    let paused = await apaToken.paused()
+    paused.should.be.true
 
     await apaCrowdsale.finalize()
 
-    let paused = await apaToken.paused()
-    paused.should.equal(true)
-
-    await apaCrowdsale.unpauseToken()
-
     paused = await apaToken.paused()
-    paused.should.equal(false)
+    paused.should.be.false
   })
 
   it('assigns tokens correctly to company when finalized', async function () {
@@ -103,7 +90,7 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     balance.should.be.bignumber.equal(expectedCompanyTokens)
 
     const buyerBalance = await apaToken.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(375000000e+18)
+    buyerBalance.should.be.bignumber.equal(400000000e+18)
 
     const totalSupply = await apaToken.totalSupply()
     totalSupply.should.be.bignumber.equal(expectedTokenSupply)
@@ -244,7 +231,23 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           await apaCrowdsale.buyTokens(purchaser2, { value: 100e+18 })
 
           const buyerBalance = await apaToken.balanceOf(purchaser2)
-          buyerBalance.should.be.bignumber.equal(6750e+18) // 30% bonus
+          buyerBalance.should.be.bignumber.equal(6500e+18) // 30% bonus
+      })
+
+      it.skip('has bonus of 40% if sending 500+ ether during the presale', async () => {
+          await timer(50) // within presale period
+          await apaCrowdsale.buyTokens(purchaser2, { value: 500e+18 })
+
+          const buyerBalance = await apaToken.balanceOf(purchaser2)
+          buyerBalance.should.be.bignumber.equal(35000e+18) // 40% bonus
+      })
+
+      it.skip('has bonus of 45% if sending 500+ ether during the presale', async () => {
+          await timer(50) // within presale period
+          await apaCrowdsale.buyTokens(purchaser2, { value: 1000e+18 })
+
+          const buyerBalance = await apaToken.balanceOf(purchaser2)
+          buyerBalance.should.be.bignumber.equal(72500e+18) // 45% bonus
       })
 
       it('has bonus of 20% during first crowdsale bonus period', async () => {
@@ -357,7 +360,6 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
           await timer(dayInSecs * 70)
           await apaCrowdsale.finalize()
-          await apaCrowdsale.unpauseToken()
 
           const companyAllocations = await apaCrowdsale.companyAllocation()
           companyAllocationsContract = CompanyAllocation.at(companyAllocations)
