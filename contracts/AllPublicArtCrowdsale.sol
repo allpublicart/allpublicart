@@ -279,6 +279,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
      * @return bonus percentage as uint
      */
      function calculatePreSaleBonus(address beneficiary) internal returns (uint256) {
+         require(msg.value <= 5000 ether);
          /*
              Public Pre Sale details:
              Minimum Contribution            Bonus
