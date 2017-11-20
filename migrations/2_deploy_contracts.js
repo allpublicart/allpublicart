@@ -13,17 +13,32 @@ const rate = new BigNumber(500)
 const preferentialRate = new BigNumber(100)
 
 module.exports = function(deployer, network, [_, wallet]) {
-  deployer.deploy(AllPublicArtToken);
-  deployer.deploy(
-      AllPublicArtCrowdsale,
-      startTime,
-      preSaleEnds,
-      firstBonusSalesEnds,
-      secondBonusSalesEnds,
-      thirdBonusSalesEnds,
-      endTime,
-      rate,
-      preferentialRate,
-      wallet
-  );
+    if(network == "testnet" || network == "rinkeby") {
+        deployer.deploy(
+            AllPublicArtCrowdsale,
+            startTime,
+            preSaleEnds,
+            firstBonusSalesEnds,
+            secondBonusSalesEnds,
+            thirdBonusSalesEnds,
+            endTime,
+            rate,
+            preferentialRate,
+            wallet
+        );
+    } else {
+      deployer.deploy(AllPublicArtToken);
+      deployer.deploy(
+          AllPublicArtCrowdsale,
+          startTime,
+          preSaleEnds,
+          firstBonusSalesEnds,
+          secondBonusSalesEnds,
+          thirdBonusSalesEnds,
+          endTime,
+          rate,
+          preferentialRate,
+          wallet
+      );
+  }
 };

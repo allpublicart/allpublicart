@@ -94,7 +94,33 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         whitelist[buyer] = true;
     }
 
-    // NOTE: write test for this.
+    /**
+     * @dev checks whether address is whitelisted
+     * @param buyer Purchaser's address to check
+     * @return true if buyer is whitelisted
+     */
+    function isWhitelisted(address buyer) public constant returns (bool) {
+        return whitelist[buyer];
+    }
+
+    /**
+     * @dev Add artists addresses as a whitelist mechanism
+     * @param artist Artist's address to be whitelisted
+     */
+    function whitelistArtist(address artist) public onlyOwner {
+        require(artist != address(0));
+        artistWhitelist[artist] = true;
+    }
+
+    /**
+     * @dev checks whether artist address is whitelisted
+     * @param artist Artist's address to check
+     * @return true if artist is whitelisted
+     */
+    function isArtist(address artist) public constant returns (bool) {
+        return artistWhitelist[artist];
+    }
+
     /**
      * @dev Mint tokens for private investors before crowdsale starts
      * @param investorsAddress Purchaser's address
@@ -114,34 +140,6 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
 
         token.mint(investorsAddress, tokens);
         PrivateInvestorTokenPurchase(investorsAddress, rate, bonus, weiAmount);
-    }
-
-
-    /**
-     * @dev Add artists addresses as a whitelist mechanism
-     * @param artist Artist's address to be whitelisted
-     */
-    function whitelistArtist(address artist) public onlyOwner {
-        require(artist != address(0));
-        artistWhitelist[artist] = true;
-    }
-
-    /**
-     * @dev checks whether address is whitelisted
-     * @param buyer Purchaser's address to check
-     * @return true if buyer is whitelisted
-     */
-    function isWhitelisted(address buyer) public constant returns (bool) {
-        return whitelist[buyer];
-    }
-
-    /**
-     * @dev checks whether artist address is whitelisted
-     * @param artist Artist's address to check
-     * @return true if artist is whitelisted
-     */
-    function checkForWhitelistedArtist(address artist) public constant returns (bool) {
-        return artistWhitelist[artist];
     }
 
     /**
@@ -211,7 +209,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         require(validPurchase() && token.totalSupply() <= totalSupplyCrowdsale);
 
         uint256 weiAmount = msg.value;
-        uint256 bonus = getBonusTier();
+        uint256 bonus = getBonusTier(beneficiary);
 
         uint256 rate = getRate(beneficiary);
         // calculate token amount to be created
@@ -277,19 +275,23 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
 
     /**
      * @dev calculates pre sale bonus tier
+     * @param beneficiary Address of the purchaser
      * @return bonus percentage as uint
      */
-     function calculatePreSaleBonus() internal returns (uint256) {
+     function calculatePreSaleBonus(address beneficiary) internal returns (uint256) {
          /*
-            0-35 no minimum for Artists 20%
-            35+ ETH ($10.5k)            25%
-            100+ ETH ($30k)             30%
-            500+ ETH ($150k)            40%
-            1000+ ETH ($300k)           45%
+             Public Pre Sale details:
+             Minimum Contribution            Bonus
+             35- ETH no minimum for Artists  20%
+             35+ ETH ($10.5k)                20%
+             100+ ETH ($30k)                 30%
+             500+ ETH ($150k)                40%
+             1000+ ETH ($300k)               45%
          */
-
-         if (msg.value < 35 ether)
+         if (msg.value < 35 ether && isArtist(beneficiary))
             return 20;
+         if (msg.value < 35)
+            return 0;
          if (msg.value >= 35 ether && msg.value < 100 ether)
             return 25;
          if (msg.value >= 100 ether && msg.value < 500 ether)
@@ -302,9 +304,10 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
 
     /**
      * @dev Fetches Bonus tier percentage per bonus milestones
+     * @param beneficiary Address of the purchaser
      * @return uint256 representing percentage of the bonus tier
      */
-    function getBonusTier() internal returns (uint256) {
+    function getBonusTier(address beneficiary) internal returns (uint256) {
         bool preSalePeriod = now >= startTime && now <= preSaleEnds;
         bool firstBonusSalesPeriod = now > preSaleEnds && now <= firstBonusSalesEnds; // 20% bonus
         bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 15% bonus
@@ -312,7 +315,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; //  0 % bonus
 
         if (preSalePeriod)
-            return calculatePreSaleBonus();
+            return calculatePreSaleBonus(beneficiary);
         if (firstBonusSalesPeriod) return 20;
         if (secondBonusSalesPeriod) return 15;
         if (thirdBonusSalesPeriod) return 10;

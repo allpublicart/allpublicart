@@ -45,8 +45,8 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
     }
 
   beforeEach('initialize contract', async () => {
-    apaCrowdsale = await newCrowdsale(rate)
-    apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+      apaCrowdsale = await newCrowdsale(rate)
+      apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
   })
 
 
@@ -56,65 +56,65 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
   })
 
   it('starts with token paused', async () => {
-    const paused = await apaToken.paused()
-    paused.should.equal(true)
+      const paused = await apaToken.paused()
+      paused.should.equal(true)
   })
 
   it('token is unpaused after crowdsale ends', async function () {
-    timer(endTime + 30)
+      timer(endTime + 30)
 
-    let paused = await apaToken.paused()
-    paused.should.be.true
+      let paused = await apaToken.paused()
+      paused.should.be.true
 
-    await apaCrowdsale.finalize()
+      await apaCrowdsale.finalize()
 
-    paused = await apaToken.paused()
-    paused.should.be.false
+      paused = await apaToken.paused()
+      paused.should.be.false
   })
 
   it('assigns tokens correctly to company when finalized', async function () {
-    apaCrowdsale = await newCrowdsale(newRate)
-    apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+      apaCrowdsale = await newCrowdsale(newRate)
+      apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
 
-    await timer(dayInSecs * 42)
+      await timer(dayInSecs * 42)
 
-    await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
+      await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
 
-    await timer(endTime + 30)
-    await apaCrowdsale.finalize()
+      await timer(endTime + 30)
+      await apaCrowdsale.finalize()
 
-    const companyAllocation = await apaCrowdsale.companyAllocation()
-    const balance = await apaToken.balanceOf(companyAllocation)
-    balance.should.be.bignumber.equal(expectedCompanyTokens)
+      const companyAllocation = await apaCrowdsale.companyAllocation()
+      const balance = await apaToken.balanceOf(companyAllocation)
+      balance.should.be.bignumber.equal(expectedCompanyTokens)
 
-    const buyerBalance = await apaToken.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(400000000e+18)
+      const buyerBalance = await apaToken.balanceOf(buyer)
+      buyerBalance.should.be.bignumber.equal(400000000e+18)
 
-    const totalSupply = await apaToken.totalSupply()
-    totalSupply.should.be.bignumber.equal(expectedTokenSupply)
+      const totalSupply = await apaToken.totalSupply()
+      totalSupply.should.be.bignumber.equal(expectedTokenSupply)
   })
 
   it('assigns remaining tokens to company if not all tokens are sold during crowdsale', async function () {
-    const fictiousRate =  new BigNumber(300000000);
-    apaCrowdsale = await newCrowdsale(fictiousRate)
-    apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
+      const fictiousRate =  new BigNumber(300000000);
+      apaCrowdsale = await newCrowdsale(fictiousRate)
+      apaToken = AllPublicArtToken.at(await apaCrowdsale.token())
 
-    await timer(dayInSecs * 42)
+      await timer(dayInSecs * 42)
 
-    await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
+      await apaCrowdsale.buyTokens(buyer, {value, from: purchaser})
 
-    await timer(endTime + 30)
-    await apaCrowdsale.finalize()
+      await timer(endTime + 30)
+      await apaCrowdsale.finalize()
 
-    const companyAllocation = await apaCrowdsale.companyAllocation()
-    const balance = await apaToken.balanceOf(companyAllocation)
-    balance.should.be.bignumber.equal(700000000e+18)
+      const companyAllocation = await apaCrowdsale.companyAllocation()
+      const balance = await apaToken.balanceOf(companyAllocation)
+      balance.should.be.bignumber.equal(700000000e+18)
 
-    const buyerBalance = await apaToken.balanceOf(buyer)
-    buyerBalance.should.be.bignumber.equal(300000000e+18)
+      const buyerBalance = await apaToken.balanceOf(buyer)
+      buyerBalance.should.be.bignumber.equal(300000000e+18)
 
-    const totalSupply = await apaToken.totalSupply()
-    totalSupply.should.be.bignumber.equal(expectedTokenSupply)
+      const totalSupply = await apaToken.totalSupply()
+      totalSupply.should.be.bignumber.equal(expectedTokenSupply)
   })
 
   describe('forward funds', () => {
@@ -186,12 +186,12 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
 
   describe('token purchases plus their bonuses', () => {
       it('does NOT buy tokens if crowdsale is paused', async () => {
-          await timer(dayInSecs * 40)
+          timer(dayInSecs * 40)
           await apaCrowdsale.pause()
           let buyerBalance
 
           try {
-              await apaCrowdsale.buyTokens(buyer, { value })
+              await apaCrowdsale.buyTokens(buyer, { value, from: buyer })
               assert.fail()
           } catch(e) {
               ensuresException(e)
@@ -201,13 +201,23 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           buyerBalance.should.be.bignumber.equal(0)
 
           await apaCrowdsale.unpause()
-          await apaCrowdsale.buyTokens(buyer, { value })
+          await apaCrowdsale.buyTokens(buyer, { value, from: buyer })
 
           buyerBalance = await apaToken.balanceOf(buyer)
           buyerBalance.should.be.bignumber.equal(50e+18)
       })
 
-      it('has bonus of 20% if sending less than 35 during the presale', async () => {
+      it('has bonus of 0% when sending less than 35 during the presale and NOT being an artist', async () => {
+          await timer(50) // within presale period
+
+          await apaCrowdsale.buyTokens(buyer2, { value: 1e+18 })
+
+          const buyerBalance = await apaToken.balanceOf(buyer2)
+          buyerBalance.should.be.bignumber.equal(50e+18) // 0% bonus
+      })
+
+      it('has bonus of 20% if sending less than 35 during the presale and is an artist', async () => {
+          await apaCrowdsale.whitelistArtist(buyer2)
           await timer(50) // within presale period
 
           await apaCrowdsale.buyTokens(buyer2, { value: 1e+18 })
@@ -289,7 +299,33 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
       })
   })
 
-  describe('whitelisting', () => {
+  describe('#mintTokenForPrivateInvestors', function () {
+      it('does NOT mint tokens for private investors after crowdsale has started', async () => {
+          timer(50)
+
+          try {
+              await apaCrowdsale.mintTokenForPrivateInvestors(buyer, rate, 0,  value)
+              assert.fail()
+          } catch(e) {
+              ensuresException(e)
+          }
+          const buyerBalance = await apaToken.balanceOf(buyer)
+          buyerBalance.should.be.bignumber.equal(0)
+      })
+
+      it('mints tokens to private investors before the crowdsale starts', async () => {
+          const { logs } = await apaCrowdsale.mintTokenForPrivateInvestors(buyer, rate, 0,  value)
+
+          const buyerBalance = await apaToken.balanceOf(buyer)
+          buyerBalance.should.be.bignumber.equal(50e+18)
+
+          const event = logs.find(e => e.event === 'PrivateInvestorTokenPurchase')
+          should.exist(event)
+      })
+  })
+
+  describe('whitelisting', function () {
+      // whitelist buyers
       it('should add address to whitelist', async () => {
           let whitelisted = await apaCrowdsale.isWhitelisted(sender)
           whitelisted.should.be.false
@@ -297,16 +333,6 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           await apaCrowdsale.addToWhitelist(sender, {from: owner})
           whitelisted = await apaCrowdsale.isWhitelisted(sender)
           whitelisted.should.be.true
-      })
-
-      it('should reject non-whitelisted sender', async () => {
-          timer(20)
-
-          try {
-              await apaCrowdsale.buyTokens(beneficiary, {value, from: sender})
-          } catch(error) {
-              ensuresException(error)
-          }
       })
 
       it('should sell to whitelisted address', async () => {
@@ -345,6 +371,38 @@ contract('AllPublicArtCrowdsale', ([owner, wallet, buyer, purchaser, buyer2, pur
           const raised = await apaCrowdsale.weiRaised();
           raised.should.be.bignumber.equal(value)
       })
+
+     // whitelisting artists
+     it('does NOT allow a non owner to whitelist artist', async () => {
+         try {
+             await apaCrowdsale.whitelistArtist(beneficiary, { from: sender } )
+             assert.fail()
+         } catch(error) {
+             ensuresException(error)
+         }
+
+         const isArtist = await apaCrowdsale.isArtist(beneficiary)
+         isArtist.should.be.false
+     })
+
+     it('does NOT allow the whitelist of an artist if the address is empty', async () => {
+         try {
+             await apaCrowdsale.whitelistArtist('0x0000000000000000000000000000000000000000', { from: sender } )
+             assert.fail()
+         } catch(error) {
+             ensuresException(error)
+         }
+
+         const isArtist = await apaCrowdsale.isArtist('0x0000000000000000000000000000000000000000')
+         isArtist.should.be.false
+     })
+
+     it('allows the whitelisting of an artist by the contract owner not allow a non owner to whitelist artist', async () => {
+        await apaCrowdsale.whitelistArtist(beneficiary, { from: owner } )
+
+         const isArtist = await apaCrowdsale.isArtist(beneficiary)
+         isArtist.should.be.true
+     })
   })
 
   describe('companyAllocations', () => {
