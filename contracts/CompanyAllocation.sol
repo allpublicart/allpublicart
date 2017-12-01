@@ -1,4 +1,4 @@
-pragma solidity ^0.4.13;
+pragma solidity 0.4.18;
 
 import './AllPublicArtToken.sol';
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
@@ -14,7 +14,7 @@ contract CompanyAllocation {
 
     mapping (address => uint256) public companyAllocations;
 
-    AllPublicArtToken apa;
+    AllPublicArtToken public apa;
 
     /**
      * @dev Throws if called by any account other than the owner.
@@ -29,7 +29,7 @@ contract CompanyAllocation {
      * @param _owner Contract owner
      * @param token Token contract address for AllPublicArtToken
      */
-    function CompanyAllocation(address _owner, address token) {
+    function CompanyAllocation(address _owner, address token) public {
         apa = AllPublicArtToken(token);
         unlockedAt = now.add(365 days);
         canSelfDestruct = now.add(600 days);
@@ -57,7 +57,8 @@ contract CompanyAllocation {
     }
 
     /**
-     * @dev Allow company to unlock allocated tokens by transferring them whitelisted addresses. Need to be called by each address
+     * @dev Allow company to unlock allocated tokens by transferring them whitelisted addresses.
+     * Need to be called by each address
      */
     function unlock() external {
         assert(now >= unlockedAt);
@@ -77,13 +78,13 @@ contract CompanyAllocation {
     /**
      * @dev allow for selfdestruct possibility and sending funds to owner
      */
-    function kill() onlyOwner() {
+    function kill() public onlyOwner {
         assert (now >= canSelfDestruct);
         uint256 balance = apa.balanceOf(this);
 
         if (balance > 0) {
- 		    apa.transfer(owner, balance);
- 		}
+            apa.transfer(owner, balance);
+        }
 
         selfdestruct(owner);
     }
