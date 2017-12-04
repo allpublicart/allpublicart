@@ -1,7 +1,12 @@
-pragma solidity ^0.4.13;
+pragma solidity 0.4.18;
 
 import './AllPublicArtToken.sol';
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
+
+/**
+ * @title Company Allocation contract - tokens allocation for company
+ * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
+ */
 
 contract CompanyAllocation {
     using SafeMath for uint;
@@ -10,11 +15,11 @@ contract CompanyAllocation {
     uint256 public canSelfDestruct;
     uint256 public tokensCreated;
     uint256 public allocatedTokens;
-    uint256 totalCompanyAllocation = 625000000e18;
+    uint256 public totalCompanyAllocation = 600000000e18;
 
     mapping (address => uint256) public companyAllocations;
 
-    AllPublicArtToken apa;
+    AllPublicArtToken public apa;
 
     /**
      * @dev Throws if called by any account other than the owner.
@@ -25,15 +30,14 @@ contract CompanyAllocation {
     }
 
     /**
-     * @dev constructor function that sets owner and token for the CompanyAllocation contract
-     * @param _owner Contract owner
-     * @param token Token contract address for AllPublicArtToken
+     * @dev constructor function that sets owner as well as unlock and selfdestruct timestamps
+     * for the CompanyAllocation contract
      */
-    function CompanyAllocation(address _owner, address token) {
-        apa = AllPublicArtToken(token);
-        unlockedAt = now.add(365 days);
-        canSelfDestruct = now.add(600 days);
-        owner = _owner;
+    function CompanyAllocation() public {
+        owner = msg.sender;
+
+        unlockedAt = now.add(90 days);
+        canSelfDestruct = now.add(365 days);
     }
 
     /**
@@ -57,9 +61,11 @@ contract CompanyAllocation {
     }
 
     /**
-     * @dev Allow company to unlock allocated tokens by transferring them whitelisted addresses. Need to be called by each address
+     * @dev Allow company to unlock allocated tokens by transferring them whitelisted addresses.
+     * Need to be called by each address
      */
     function unlock() external {
+        require(apa != address(0));
         assert(now >= unlockedAt);
 
         // During first unlock attempt fetch total number of locked tokens.
@@ -75,15 +81,24 @@ contract CompanyAllocation {
     }
 
     /**
+     * @dev setToken set apa token address in this contract's context
+     * @param token Token contract address for AllPublicArtToken
+     */
+    function setToken(address token) public onlyOwner {
+        require(apa == address(0));
+        apa = AllPublicArtToken(token);
+    }
+
+    /**
      * @dev allow for selfdestruct possibility and sending funds to owner
      */
-    function kill() onlyOwner() {
+    function kill() public onlyOwner {
         assert (now >= canSelfDestruct);
         uint256 balance = apa.balanceOf(this);
 
         if (balance > 0) {
- 		    apa.transfer(owner, balance);
- 		}
+            apa.transfer(owner, balance);
+        }
 
         selfdestruct(owner);
     }
