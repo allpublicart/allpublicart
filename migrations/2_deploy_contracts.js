@@ -1,5 +1,8 @@
 const AllPublicArtToken = artifacts.require("./AllPublicArtToken.sol");
 const AllPublicArtCrowdsale = artifacts.require("./AllPublicArtCrowdsale.sol");
+const WhitelistRegistry = artifacts.require("./WhitelistRegistry.sol");
+const APABonus = artifacts.require("./APABonus.sol");
+const CompanyAllocation = artifacts.require("./CompanyAllocation.sol");
 const BigNumber = web3.BigNumber
 
 const dayInSecs = 86400
@@ -13,32 +16,46 @@ const rate = new BigNumber(500)
 const preferentialRate = new BigNumber(100)
 
 module.exports = function(deployer, network, [_, wallet]) {
-    if(network == "testnet" || network == "rinkeby") {
-        deployer.deploy(
-            AllPublicArtCrowdsale,
+    return deployer.then(() => {
+        return deployer.deploy(WhitelistRegistry, preferentialRate)
+    }).then(() => {
+        return deployer.deploy(
+            APABonus,
             startTime,
             preSaleEnds,
             firstBonusSalesEnds,
             secondBonusSalesEnds,
             thirdBonusSalesEnds,
-            endTime,
-            rate,
-            preferentialRate,
-            wallet
-        );
-    } else {
-      deployer.deploy(AllPublicArtToken);
-      deployer.deploy(
-          AllPublicArtCrowdsale,
-          startTime,
-          preSaleEnds,
-          firstBonusSalesEnds,
-          secondBonusSalesEnds,
-          thirdBonusSalesEnds,
-          endTime,
-          rate,
-          preferentialRate,
-          wallet
-      );
-  }
+            WhitelistRegistry.address
+        )
+    }).then(() => {
+        return deployer.deploy(CompanyAllocation)
+    }).then(() => {
+        if(network == "testnet" || network == "rinkeby") {
+            return deployer.deploy(
+                AllPublicArtCrowdsale,
+                startTime,
+                endTime,
+                rate,
+                WhitelistRegistry.address,
+                APABonus.address,
+                CompanyAllocation.address,
+                wallet
+            );
+        } else {
+            return Promise.all([
+                deployer.deploy(AllPublicArtToken),
+                deployer.deploy(
+                    AllPublicArtCrowdsale,
+                    startTime,
+                    endTime,
+                    rate,
+                    WhitelistRegistry.address,
+                    APABonus.address,
+                    CompanyAllocation.address,
+                    wallet
+                )
+            ])
+        }
+    })
 };

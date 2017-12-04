@@ -4,32 +4,20 @@ import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "./AllPublicArtToken.sol";
 import "./CompanyAllocation.sol";
+import "./WhitelistRegistry.sol";
+import "./APABonus.sol";
 
 /**
  * @title All Public Art Crowdsale contract - crowdsale contract for the APA tokens.
  * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
  */
+
 contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
-    // price at which whitelisted buyers will be able to buy tokens
-    uint256 public preferentialRate;
-
-    uint256 constant public totalSupplyCrowdsale = 400000000e18;
-    uint256 public constant COMPANY_SHARE = 600000000e18; // 650M tokens allocated to company
+    uint256 constant public TOTAL_SUPPLY_CROWDSALE = 400000000e18;
+    uint256 public constant COMPANY_SHARE = 600000000e18; // 600M tokens allocated to company
     CompanyAllocation public companyAllocation;
-
-    // bonus milestones
-    uint256 public preSaleEnds;
-    uint256 public firstBonusSalesEnds;
-    uint256 public secondBonusSalesEnds;
-    uint256 public thirdBonusSalesEnds;
-
-    // customize the rate for each whitelisted buyer
-    mapping (address => uint256) public buyerRate;
-
-    // list of addresses that can purchase before crowdsale opens
-    mapping (address => bool) public whitelist;
-    // list of artist addresses that can purchase during the presale without a minimum amount
-    mapping (address => bool) public artistWhitelist;
+    WhitelistRegistry public wRegistry;
+    APABonus public apaBonus;
 
     struct TwoPercent {
         address beneficiary;
@@ -38,87 +26,35 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     TwoPercent public twoPercent;
 
     // Events
-    event PreferentialUserRateChange(address indexed buyer, uint256 rate);
     event PrivateInvestorTokenPurchase(address indexed investor, uint256 rate, uint256 bonus, uint weiAmount);
-    event PreferentialRateChange(uint256 rate);
 
     /**
      * @dev Contract constructor function
      * @param _startTime The timestamp of the beginning of the crowdsale
      * @param _endTime Timestamp when the crowdsale will finish
      * @param _rate The token rate per ETH
-     * @param _preferentialRate Rate for whitelisted pre sale purchasers
+     * @param _whitelistRegistry Address of the whitelist registry contract
      * @param _wallet Multisig wallet that will hold the crowdsale funds.
      */
     function AllPublicArtCrowdsale
         (
             uint256 _startTime,
-            uint256 _preSaleEnds,
-            uint256 _firstBonusSalesEnds,
-            uint256 _secondBonusSalesEnds,
-            uint256 _thirdBonusSalesEnds,
             uint256 _endTime,
             uint256 _rate,
-            uint256 _preferentialRate,
+            uint256 _whitelistRegistry,
+            uint256 _apaBonus,
+            uint256 _companyAllocation,
             address _wallet
         )
-
+        public
         FinalizableCrowdsale()
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
-
-        // setup for token bonus milestones
-        preSaleEnds = _preSaleEnds;
-        firstBonusSalesEnds = _firstBonusSalesEnds;
-        secondBonusSalesEnds = _secondBonusSalesEnds;
-        thirdBonusSalesEnds = _thirdBonusSalesEnds;
-
-        preferentialRate = _preferentialRate;
+        wRegistry = WhitelistRegistry(_whitelistRegistry);
+        apaBonus = APABonus(_apaBonus);
+        companyAllocation = CompanyAllocation(_companyAllocation);
 
         AllPublicArtToken(token).pause();
-    }
-
-    /**
-     * @dev Creates AllPublicArtToken contract. This is called on the constructor function of the Crowdsale contract
-     */
-    function createTokenContract() internal returns (MintableToken) {
-        return new AllPublicArtToken();
-    }
-
-    /**
-     * @dev Add whitelist addresses that can participate in the pre and crowdsale with a preferential rate
-     * @param buyer Purchaser's address to be whitelisted
-     */
-    function addToWhitelist(address buyer) public onlyOwner {
-        require(buyer != address(0));
-        whitelist[buyer] = true;
-    }
-
-    /**
-     * @dev checks whether address is whitelisted
-     * @param buyer Purchaser's address to check
-     * @return true if buyer is whitelisted
-     */
-    function isWhitelisted(address buyer) public constant returns (bool) {
-        return whitelist[buyer];
-    }
-
-    /**
-     * @dev Add artists addresses as a whitelist mechanism
-     * @param artist Artist's address to be whitelisted
-     */
-    function whitelistArtist(address artist) public onlyOwner {
-        require(artist != address(0));
-        artistWhitelist[artist] = true;
-    }
-
-    /**
-     * @dev checks whether artist address is whitelisted
-     * @param artist Artist's address to check
-     * @return true if artist is whitelisted
-     */
-    function isArtist(address artist) public constant returns (bool) {
-        return artistWhitelist[artist];
     }
 
     /**
@@ -143,57 +79,13 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     }
 
     /**
-     * @dev overrides Crowdsale#validPurchase to add whitelist logic
-     * @return true if buyers is able to buy at the moment
+     * @dev Add twoPercent beneficiary address to the contract
+     * @param beneficiaryAddress Aaddress in which the one percent of purchases will go to
      */
-    function validPurchase() internal constant returns (bool) {
-        return super.validPurchase() || (!hasEnded() && isWhitelisted(msg.sender));
-    }
-
-    /**
-     * @dev sets preferentialRate for a whitelisted buyer
-     * @param buyer Address that is whitelisted already
-     * @param rate Customizable rate
-     */
-    function setBuyerRate(address buyer, uint256 rate) onlyOwner public {
-        require(rate != 0);
-        require(isWhitelisted(buyer));
-
-        buyerRate[buyer] = rate;
-
-        PreferentialUserRateChange(buyer, rate);
-    }
-
-    /**
-     * @dev sets global preferentialRate for whitelisted buyer that has no customized rate
-     * @param rate New global preferentialRate
-     */
-    function setPreferantialRate(uint256 rate) onlyOwner public {
-        require(rate != 0);
-
-        preferentialRate = rate;
-
-        PreferentialRateChange(rate);
-    }
-
-    /**
-     * @dev internal functions that fetches the rate for the purchase
-     * @param beneficiary Address of the purchaser
-     * @return uint256 of the rate to be used
-     */
-    function getRate(address beneficiary) internal returns(uint256) {
-        // some early buyers are offered a discount on the crowdsale price
-        if (buyerRate[beneficiary] != 0) {
-            return buyerRate[beneficiary];
-        }
-
-        // whitelisted buyers can purchase at preferential price before crowdsale ends
-        if (isWhitelisted(beneficiary)) {
-            return preferentialRate;
-        }
-
-        // otherwise it is the crowdsale rate
-        return rate;
+    function setTwoPercent(address beneficiaryAddress) public onlyOwner {
+        require(beneficiaryAddress != address(0));
+        require(twoPercent.beneficiary == address(0)); // only able to add once
+        twoPercent.beneficiary = beneficiaryAddress;
     }
 
     /**
@@ -206,10 +98,10 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         payable
     {
         require(beneficiary != address(0));
-        require(validPurchase() && token.totalSupply() <= totalSupplyCrowdsale);
+        require(validPurchase() && token.totalSupply() <= TOTAL_SUPPLY_CROWDSALE);
 
         uint256 weiAmount = msg.value;
-        uint256 bonus = getBonusTier(beneficiary);
+        uint256 bonus = apaBonus.getBonusTier(beneficiary, msg.value);
 
         uint256 rate = getRate(beneficiary);
         // calculate token amount to be created
@@ -244,82 +136,56 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     }
 
     /**
-     * @dev Add twoPercent beneficiary address to the contract
-     * @param beneficiaryAddress Aaddress in which the one percent of purchases will go to
+     * @dev Creates AllPublicArtToken contract. This is called on the constructor function of the Crowdsale contract
      */
-    function setTwoPercent(address beneficiaryAddress) public onlyOwner {
-        require(beneficiaryAddress != address(0));
-        require(twoPercent.beneficiary == address(0)); // only able to add once
-        twoPercent.beneficiary = beneficiaryAddress;
+    function createTokenContract() internal returns (MintableToken) {
+        return new AllPublicArtToken();
+    }
+
+    /**
+     * @dev overrides Crowdsale#validPurchase to add whitelist logic
+     * @return true if buyers is able to buy at the moment
+     */
+    function validPurchase() internal constant returns (bool) {
+        return super.validPurchase() || (!hasEnded() && wRegistry.isWhitelisted(msg.sender));
+    }
+
+    /**
+     * @dev internal functions that fetches the rate for the purchase
+     * @param beneficiary Address of the purchaser
+     * @return uint256 of the rate to be used
+     */
+    function getRate(address beneficiary) internal returns(uint256) {
+        // some early buyers are offered a discount on the crowdsale price
+        if (wRegistry.buyerRate(beneficiary) != 0) {
+            return wRegistry.buyerRate(beneficiary);
+        }
+
+        // whitelisted buyers can purchase at preferential price before crowdsale ends
+        if (wRegistry.isWhitelisted(beneficiary)) {
+            return wRegistry.preferentialRate();
+        }
+
+        // otherwise it is the crowdsale rate
+        return rate;
     }
 
     /**
      * @dev finalizes crowdsale
      */
     function finalization() internal {
-       uint256 totalSupply = token.totalSupply();
-       companyAllocation = new CompanyAllocation(owner, token);
+        uint256 totalSupply = token.totalSupply();
 
-       // emit tokens for the company
-       token.mint(companyAllocation, COMPANY_SHARE);
+        // emit tokens for the company
+        token.mint(companyAllocation, COMPANY_SHARE);
 
-       if (totalSupply < totalSupplyCrowdsale) {
-           uint256 remainingTokens = totalSupplyCrowdsale.sub(totalSupply);
+        if (totalSupply < TOTAL_SUPPLY_CROWDSALE) {
+            uint256 remainingTokens = TOTAL_SUPPLY_CROWDSALE.sub(totalSupply);
 
-           token.mint(companyAllocation, remainingTokens);
-       }
+            token.mint(companyAllocation, remainingTokens);
+        }
 
-       AllPublicArtToken(token).unpause();
-       super.finalization();
-    }
-
-    /**
-     * @dev calculates pre sale bonus tier
-     * @param beneficiary Address of the purchaser
-     * @return bonus percentage as uint
-     */
-     function calculatePreSaleBonus(address beneficiary) internal returns (uint256) {
-         require(msg.value <= 5000 ether);
-         /*
-             Public Pre Sale details:
-             Minimum Contribution            Bonus
-             35- ETH no minimum for Artists  20%
-             35+ ETH ($10.5k)                20%
-             100+ ETH ($30k)                 30%
-             500+ ETH ($150k)                40%
-             1000+ ETH ($300k)               45%
-         */
-         if (msg.value < 35 ether && isArtist(beneficiary))
-            return 20;
-         if (msg.value < 35)
-            return 0;
-         if (msg.value >= 35 ether && msg.value < 100 ether)
-            return 25;
-         if (msg.value >= 100 ether && msg.value < 500 ether)
-            return 30;
-         if (msg.value >= 500 ether && msg.value < 1000 ether)
-            return 40;
-         if (msg.value >= 1000 ether)
-            return 45;
-     }
-
-    /**
-     * @dev Fetches Bonus tier percentage per bonus milestones
-     * @param beneficiary Address of the purchaser
-     * @return uint256 representing percentage of the bonus tier
-     */
-    function getBonusTier(address beneficiary) internal returns (uint256) {
-        bool preSalePeriod = now >= startTime && now <= preSaleEnds;
-        bool firstBonusSalesPeriod = now > preSaleEnds && now <= firstBonusSalesEnds; // 20% bonus
-        bool secondBonusSalesPeriod = now > firstBonusSalesEnds && now <= secondBonusSalesEnds; // 15% bonus
-        bool thirdBonusSalesPeriod = now > secondBonusSalesEnds && now <= thirdBonusSalesEnds; //  10% bonus
-        bool fourthBonusSalesPeriod = now > thirdBonusSalesEnds; //  0 % bonus
-
-        if (preSalePeriod)
-            return calculatePreSaleBonus(beneficiary);
-        if (firstBonusSalesPeriod) return 20;
-        if (secondBonusSalesPeriod) return 15;
-        if (thirdBonusSalesPeriod) return 10;
-        if (fourthBonusSalesPeriod) return 0;
+        AllPublicArtToken(token).unpause();
+        super.finalization();
     }
 }

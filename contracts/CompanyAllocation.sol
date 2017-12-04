@@ -3,6 +3,11 @@ pragma solidity 0.4.18;
 import './AllPublicArtToken.sol';
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
 
+/**
+ * @title Company Allocation contract - tokens allocation for company
+ * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
+ */
+
 contract CompanyAllocation {
     using SafeMath for uint;
     address public owner;
@@ -10,7 +15,7 @@ contract CompanyAllocation {
     uint256 public canSelfDestruct;
     uint256 public tokensCreated;
     uint256 public allocatedTokens;
-    uint256 totalCompanyAllocation = 625000000e18;
+    uint256 public totalCompanyAllocation = 600000000e18;
 
     mapping (address => uint256) public companyAllocations;
 
@@ -25,15 +30,14 @@ contract CompanyAllocation {
     }
 
     /**
-     * @dev constructor function that sets owner and token for the CompanyAllocation contract
-     * @param _owner Contract owner
-     * @param token Token contract address for AllPublicArtToken
+     * @dev constructor function that sets owner as well as unlock and selfdestruct timestamps
+     * for the CompanyAllocation contract
      */
-    function CompanyAllocation(address _owner, address token) public {
-        apa = AllPublicArtToken(token);
-        unlockedAt = now.add(365 days);
-        canSelfDestruct = now.add(600 days);
-        owner = _owner;
+    function CompanyAllocation() public {
+        owner = msg.sender;
+
+        unlockedAt = now.add(90 days);
+        canSelfDestruct = now.add(365 days);
     }
 
     /**
@@ -61,6 +65,7 @@ contract CompanyAllocation {
      * Need to be called by each address
      */
     function unlock() external {
+        require(apa != address(0));
         assert(now >= unlockedAt);
 
         // During first unlock attempt fetch total number of locked tokens.
@@ -73,6 +78,15 @@ contract CompanyAllocation {
 
         // Will fail if allocation (and therefore toTransfer) is 0.
         require(apa.transfer(msg.sender, transferAllocation));
+    }
+
+    /**
+     * @dev setToken set apa token address in this contract's context
+     * @param token Token contract address for AllPublicArtToken
+     */
+    function setToken(address token) public onlyOwner {
+        require(apa == address(0));
+        apa = AllPublicArtToken(token);
     }
 
     /**
