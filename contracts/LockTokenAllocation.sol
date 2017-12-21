@@ -4,20 +4,20 @@ import './AllPublicArtToken.sol';
 import 'zeppelin-solidity/contracts/math/SafeMath.sol';
 
 /**
- * @title Company Allocation contract - tokens allocation for company
+ * @title Locking Token Allocation contract - lock tokens allocation
  * @author Gustavo Guimaraes - <gustavoguimaraes@gmail.com>
  */
 
-contract CompanyAllocation {
+contract LockTokenAllocation {
     using SafeMath for uint;
     address public owner;
     uint256 public unlockedAt;
     uint256 public canSelfDestruct;
     uint256 public tokensCreated;
     uint256 public allocatedTokens;
-    uint256 public totalCompanyAllocation = 600000000e18;
+    uint256 public totalLockTokenAllocation;
 
-    mapping (address => uint256) public companyAllocations;
+    mapping (address => uint256) public lockedAllocations;
 
     AllPublicArtToken public apa;
 
@@ -31,37 +31,47 @@ contract CompanyAllocation {
 
     /**
      * @dev constructor function that sets owner as well as unlock and selfdestruct timestamps
-     * for the CompanyAllocation contract
+     * for the LockTokenAllocation contract
      */
-    function CompanyAllocation() public {
-        owner = msg.sender;
-
-        unlockedAt = now.add(90 days);
-        canSelfDestruct = now.add(365 days);
+    function LockTokenAllocation
+        (
+            address _owner,
+            address _token,
+            uint256 _unlockedAt,
+            uint256 _canSelfDestruct,
+            uint256 _totalLockTokenAllocation
+        )
+        public
+    {
+        owner = _owner;
+        apa = AllPublicArtToken(_token);
+        unlockedAt = _unlockedAt;
+        canSelfDestruct = _canSelfDestruct;
+        totalLockTokenAllocation = _totalLockTokenAllocation;
     }
 
     /**
      * @dev Adds founders' token allocation
-     * @param foundersAddress Address of a founder
-     * @param allocationValue Number of tokens allocated to a founder
+     * @param beneficiary Ethereum address of a person
+     * @param allocationValue Number of tokens allocated to person
      * @return true if address is correctly added
      */
-    function addCompanyAllocation(address foundersAddress, uint256 allocationValue)
+    function addLockTokenAllocation(address beneficiary, uint256 allocationValue)
         external
         onlyOwner
         returns(bool)
     {
-        assert(companyAllocations[foundersAddress] == 0); // can only add once.
+        assert(lockedAllocations[beneficiary] == 0); // can only add once.
 
         allocatedTokens = allocatedTokens.add(allocationValue);
-        require(allocatedTokens <= totalCompanyAllocation);
+        require(allocatedTokens <= totalLockTokenAllocation);
 
-        companyAllocations[foundersAddress] = allocationValue;
+        lockedAllocations[beneficiary] = allocationValue;
         return true;
     }
 
     /**
-     * @dev Allow company to unlock allocated tokens by transferring them whitelisted addresses.
+     * @dev Allow unlocking of allocated tokens by transferring them to whitelisted addresses.
      * Need to be called by each address
      */
     function unlock() external {
@@ -73,20 +83,11 @@ contract CompanyAllocation {
             tokensCreated = apa.balanceOf(this);
         }
 
-        uint256 transferAllocation = companyAllocations[msg.sender];
-        companyAllocations[msg.sender] = 0;
+        uint256 transferAllocation = lockedAllocations[msg.sender];
+        lockedAllocations[msg.sender] = 0;
 
         // Will fail if allocation (and therefore toTransfer) is 0.
         require(apa.transfer(msg.sender, transferAllocation));
-    }
-
-    /**
-     * @dev setToken set apa token address in this contract's context
-     * @param token Token contract address for AllPublicArtToken
-     */
-    function setToken(address token) public onlyOwner {
-        require(apa == address(0));
-        apa = AllPublicArtToken(token);
     }
 
     /**

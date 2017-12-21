@@ -3,7 +3,6 @@ pragma solidity 0.4.18;
 import "zeppelin-solidity/contracts/crowdsale/FinalizableCrowdsale.sol";
 import "zeppelin-solidity/contracts/lifecycle/Pausable.sol";
 import "./AllPublicArtToken.sol";
-import "./CompanyAllocation.sol";
 import "./WhitelistRegistry.sol";
 import "./APABonus.sol";
 
@@ -13,9 +12,7 @@ import "./APABonus.sol";
  */
 
 contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
-    uint256 constant public TOTAL_SUPPLY_CROWDSALE = 400000000e18;
-    uint256 public constant COMPANY_SHARE = 600000000e18; // 600M tokens allocated to company
-    CompanyAllocation public companyAllocation;
+    uint256 public constant TOTAL_SUPPLY_CROWDSALE = 400000000e18;
     WhitelistRegistry public wRegistry;
     APABonus public apaBonus;
 
@@ -23,9 +20,25 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         address beneficiary;
     }
 
+    struct CrowdsalePurchase {
+        address purchaser;
+        uint256 bonusAmount;
+        uint256 weiContributed;
+    }
+
+    CrowdsalePurchase[] public crowdsalePurchases;
+    mapping (address => uint256) public crowdsalePurchaseAmountBy;
+    // after the crowdsale
+    mapping (address => uint256) public numOfWithdrawnTokensBy;
+    uint256 public numOfLoadedCrowdsalePurchases; // index to keep the number of crowdsale purchases that have already had the tokens withdrawn
+    bool public tokensWithdrawn;   // returns whether all tokens have been withdrawn
+    uint256 public finalRate;
+
     TwoPercent public twoPercent;
 
     // Events
+    event PurchaseInfo(address indexed purchaser, uint256 bonusAmount, uint256 weiContributed);
+    event MintedTokensFor(address indexed beneficiary, uint256 tokenAmount);
     event PrivateInvestorTokenPurchase(address indexed investor, uint256 rate, uint256 bonus, uint weiAmount);
 
     /**
@@ -43,7 +56,6 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
             uint256 _rate,
             uint256 _whitelistRegistry,
             uint256 _apaBonus,
-            uint256 _companyAllocation,
             address _wallet
         )
         public
@@ -52,7 +64,6 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     {
         wRegistry = WhitelistRegistry(_whitelistRegistry);
         apaBonus = APABonus(_apaBonus);
-        companyAllocation = CompanyAllocation(_companyAllocation);
 
         AllPublicArtToken(token).pause();
     }
@@ -68,14 +79,23 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         external
         onlyOwner
     {
-        require(now <= startTime);
-
         uint256 tokens = rate.mul(weiAmount);
         uint256 tokenBonus = tokens.mul(bonus).div(100);
         tokens = tokens.add(tokenBonus);
 
         token.mint(investorsAddress, tokens);
         PrivateInvestorTokenPurchase(investorsAddress, rate, bonus, weiAmount);
+        MintedTokensFor(investorsAddress, tokens);
+    }
+
+    /**
+     * @dev Mint tokens company, advisors and bounty
+     * @param amountOfTokens Number of tokens to be created
+     */
+    function mintTokensFor(address beneficiaryAddress, uint256 amountOfTokens) public onlyOwner {
+        require(now > endTime);
+        token.mint(beneficiaryAddress, amountOfTokens);
+        MintedTokensFor(beneficiaryAddress, amountOfTokens);
     }
 
     /**
@@ -86,6 +106,22 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         require(beneficiaryAddress != address(0));
         require(twoPercent.beneficiary == address(0)); // only able to add once
         twoPercent.beneficiary = beneficiaryAddress;
+    }
+
+    /**
+     * @dev Sets final rate for the crowdsale
+     * @param _finalRate Rate which tokens will be calculated from
+     */
+    function setFinalRate(uint256 _finalRate) public onlyOwner {
+        require(_finalRate != 0);
+        finalRate = _finalRate;
+    }
+
+    /**
+     * @dev Returns number of purchases to date.
+     */
+    function numOfPurchases() public constant returns (uint256) {
+        return crowdsalePurchases.length;
     }
 
     /**
@@ -103,24 +139,57 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         uint256 weiAmount = msg.value;
         uint256 bonus = apaBonus.getBonusTier(beneficiary, msg.value);
 
-        uint256 rate = getRate(beneficiary);
-        // calculate token amount to be created
-        uint256 tokens = weiAmount.mul(rate);
-
-        if (bonus > 0) {
-            uint256 tokensIncludingBonus = tokens.mul(bonus).div(100);
-
-            tokens = tokens.add(tokensIncludingBonus);
-        }
-
         // update state
         weiRaised = weiRaised.add(weiAmount);
 
-        token.mint(beneficiary, tokens);
-
-        TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
+        CrowdsalePurchase memory purchase = CrowdsalePurchase(beneficiary, bonus, weiAmount);
+        crowdsalePurchases.push(purchase);
+        crowdsalePurchaseAmountBy[beneficiary] = crowdsalePurchaseAmountBy[beneficiary].add(weiAmount);
+        PurchaseInfo(beneficiary, bonus, weiAmount);
 
         forwardFunds();
+    }
+
+    /**
+     * @dev send tokens to crowdsale purchasers and keep track of them
+     */
+    function sendTokensToPurchasers()
+        public
+        onlyOwner
+    {
+        require(now > endTime && finalRate != 0);
+        require(!tokensWithdrawn);
+
+        uint256 numberOfPurchases = this.numOfPurchases();
+
+        for (uint256 i = numOfLoadedCrowdsalePurchases; i < numberOfPurchases && msg.gas > 200000; i++) {
+            CrowdsalePurchase memory csPurchases = crowdsalePurchases[i];
+            address purchaser = csPurchases.purchaser;
+            uint256 bonus = csPurchases.bonusAmount;
+            uint256 weiContributed = csPurchases.weiContributed;
+
+            uint256 rate = getRate(purchaser);
+            // calculate token amount to be created
+            uint256 tokens = weiContributed.mul(rate);
+
+            if (bonus > 0) {
+                uint256 tokensIncludingBonus = tokens.mul(bonus).div(100);
+
+                tokens = tokens.add(tokensIncludingBonus);
+            }
+
+            token.mint(purchaser, tokens);
+            TokenPurchase(msg.sender, purchaser, weiContributed, tokens);
+            MintedTokensFor(purchaser, tokens);
+            numOfWithdrawnTokensBy[purchaser] = numOfWithdrawnTokensBy[purchaser].add(tokens);
+
+            numOfLoadedCrowdsalePurchases++;    // Increase the index
+        }
+
+        assert(numOfLoadedCrowdsalePurchases <= numberOfPurchases);
+        if (numOfLoadedCrowdsalePurchases == numberOfPurchases) {
+            tokensWithdrawn = true;    // enable the flag
+        }
     }
 
     /**
@@ -166,6 +235,10 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
             return wRegistry.preferentialRate();
         }
 
+        if (finalRate != 0) {
+            return finalRate;
+        }
+
         // otherwise it is the crowdsale rate
         return rate;
     }
@@ -174,17 +247,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
      * @dev finalizes crowdsale
      */
     function finalization() internal {
-        uint256 totalSupply = token.totalSupply();
-
-        // emit tokens for the company
-        token.mint(companyAllocation, COMPANY_SHARE);
-
-        if (totalSupply < TOTAL_SUPPLY_CROWDSALE) {
-            uint256 remainingTokens = TOTAL_SUPPLY_CROWDSALE.sub(totalSupply);
-
-            token.mint(companyAllocation, remainingTokens);
-        }
-
+        token.finishMinting();
         AllPublicArtToken(token).unpause();
         super.finalization();
     }
