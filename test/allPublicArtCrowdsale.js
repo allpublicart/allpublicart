@@ -610,13 +610,16 @@ contract(
 
       it('receives 0% bonus after third crowdsale bonus period', async () => {
         timer(dayInSecs * 42);
+        // same user buying multiple times
+        await apaCrowdsale.buyTokens(buyer2, { value });
+        await apaCrowdsale.buyTokens(buyer2, { value: 2e18 });
         await apaCrowdsale.buyTokens(buyer2, { value });
 
         await timer(endTime + 30); // after the crowdsale
         await apaCrowdsale.sendTokensToPurchasers();
 
         const buyerBalance = await apaToken.balanceOf(buyer2);
-        buyerBalance.should.be.bignumber.equal(50e18); // 0% bonus
+        buyerBalance.should.be.bignumber.equal(200e18); // 0% bonus
       });
     });
 
