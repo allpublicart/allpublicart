@@ -32,7 +32,7 @@ contract WhitelistRegistry {
 
     /**
      * @dev Contructor function
-     * @param _preferentialRate Intial preferential rate
+     * @param _preferentialRate Integer for the initial preferential rate
      */
     function WhitelistRegistry(uint256 _preferentialRate) public {
         owner = msg.sender;

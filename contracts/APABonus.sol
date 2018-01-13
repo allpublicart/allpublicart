@@ -33,10 +33,12 @@ contract APABonus {
             uint256 _firstBonusSalesEnds,
             uint256 _secondBonusSalesEnds,
             uint256 _thirdBonusSalesEnds,
-            uint256 _whitelistRegistry
+            address _whitelistRegistry
         )
         public
     {
+        require(_whitelistRegistry != address(0));
+
         // setup for token bonus milestones
         startTime = _startTime;
         preSaleEnds = _preSaleEnds;
@@ -77,14 +79,14 @@ contract APABonus {
         /*
             Public Pre Sale details:
             Minimum Contribution            Bonus
-            35- ETH no minimum for Artists  20%
-            35+ ETH ($10.5k)                20%
+            35 ETH no minimum for Artists   25%
+            35+ ETH ($10.5k)                25%
             100+ ETH ($30k)                 30%
             500+ ETH ($150k)                40%
             1000+ ETH ($300k)               45%
         */
         if (value < 35 ether && wRegistry.isArtist(beneficiary))
-            return 20;
+            return 25;
         if (value < 35 ether)
             return 0;
         if (value >= 35 ether && value < 100 ether)

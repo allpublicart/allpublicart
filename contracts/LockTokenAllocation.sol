@@ -43,6 +43,8 @@ contract LockTokenAllocation {
         )
         public
     {
+        require(_token != address(0));
+        
         owner = _owner;
         apa = AllPublicArtToken(_token);
         unlockedAt = _unlockedAt;
@@ -61,7 +63,7 @@ contract LockTokenAllocation {
         onlyOwner
         returns(bool)
     {
-        assert(lockedAllocations[beneficiary] == 0); // can only add once.
+        require(lockedAllocations[beneficiary] == 0 && beneficiary != address(0)); // can only add once.
 
         allocatedTokens = allocatedTokens.add(allocationValue);
         require(allocatedTokens <= totalLockTokenAllocation);

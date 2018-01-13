@@ -12,7 +12,6 @@ import "./APABonus.sol";
  */
 
 contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
-    uint256 public constant TOTAL_SUPPLY_CROWDSALE = 400000000e18;
     WhitelistRegistry public wRegistry;
     APABonus public apaBonus;
 
@@ -30,8 +29,9 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     mapping (address => uint256) public crowdsalePurchaseAmountBy;
     // after the crowdsale
     mapping (address => uint256) public numOfWithdrawnTokensBy;
-    uint256 public numOfLoadedCrowdsalePurchases; // index to keep the number of crowdsale purchases that have already had the tokens withdrawn
-    bool public tokensWithdrawn;   // returns whether all tokens have been withdrawn
+    // index to keep the number of crowdsale purchases that have already had the tokens withdrawn
+    uint256 public numOfLoadedCrowdsalePurchases;
+    bool public tokensWithdrawn; // returns whether all tokens have been withdrawn
     uint256 public finalRate;
 
     TwoPercent public twoPercent;
@@ -47,6 +47,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
      * @param _endTime Timestamp when the crowdsale will finish
      * @param _rate The token rate per ETH
      * @param _whitelistRegistry Address of the whitelist registry contract
+     * @param _apaBonus Address of the apaBonus contract
      * @param _wallet Multisig wallet that will hold the crowdsale funds.
      */
     function AllPublicArtCrowdsale
@@ -54,14 +55,15 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
             uint256 _startTime,
             uint256 _endTime,
             uint256 _rate,
-            uint256 _whitelistRegistry,
-            uint256 _apaBonus,
+            address _whitelistRegistry,
+            address _apaBonus,
             address _wallet
         )
         public
         FinalizableCrowdsale()
         Crowdsale(_startTime, _endTime, _rate, _wallet)
     {
+        require(_whitelistRegistry != address(0) && _apaBonus != address(0));
         wRegistry = WhitelistRegistry(_whitelistRegistry);
         apaBonus = APABonus(_apaBonus);
 
@@ -69,7 +71,15 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     }
 
     /**
-     * @dev Mint tokens for private investors before crowdsale starts
+     * @dev Throws when twoPercent is not set
+     */
+    modifier twoPercentWalletIsSet() {
+        require(twoPercent.beneficiary != address(0));
+        _;
+    }
+
+    /**
+     * @dev Mint tokens for private investors thoughout the crowdsale duration
      * @param investorsAddress Purchaser's address
      * @param rate Rate of the purchase
      * @param bonus Number that represents the bonus
@@ -79,6 +89,8 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         external
         onlyOwner
     {
+        require(investorsAddress != address(0));
+
         uint256 tokens = rate.mul(weiAmount);
         uint256 tokenBonus = tokens.mul(bonus).div(100);
         tokens = tokens.add(tokenBonus);
@@ -90,17 +102,22 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
 
     /**
      * @dev Mint tokens company, advisors and bounty
+     * @param beneficiaryAddress Address of beneficiary
      * @param amountOfTokens Number of tokens to be created
      */
-    function mintTokensFor(address beneficiaryAddress, uint256 amountOfTokens) public onlyOwner {
-        require(now > endTime);
+    function mintTokensFor(address beneficiaryAddress, uint256 amountOfTokens)
+        public
+        onlyOwner
+    {
+        require(beneficiaryAddress != address(0) && hasEnded());
+
         token.mint(beneficiaryAddress, amountOfTokens);
         MintedTokensFor(beneficiaryAddress, amountOfTokens);
     }
 
     /**
      * @dev Add twoPercent beneficiary address to the contract
-     * @param beneficiaryAddress Aaddress in which the one percent of purchases will go to
+     * @param beneficiaryAddress Address in which the two percent of purchases will go to
      */
     function setTwoPercent(address beneficiaryAddress) public onlyOwner {
         require(beneficiaryAddress != address(0));
@@ -131,10 +148,11 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
     function buyTokens(address beneficiary)
         public
         whenNotPaused
+        twoPercentWalletIsSet
         payable
     {
         require(beneficiary != address(0));
-        require(validPurchase() && token.totalSupply() <= TOTAL_SUPPLY_CROWDSALE);
+        require(validPurchase());
 
         uint256 weiAmount = msg.value;
         uint256 bonus = apaBonus.getBonusTier(beneficiary, msg.value);
@@ -157,7 +175,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
         public
         onlyOwner
     {
-        require(now > endTime && finalRate != 0);
+        require(hasEnded() && finalRate != 0);
         require(!tokensWithdrawn);
 
         uint256 numberOfPurchases = this.numOfPurchases();
@@ -216,7 +234,7 @@ contract AllPublicArtCrowdsale is FinalizableCrowdsale, Pausable {
      * @return true if buyers is able to buy at the moment
      */
     function validPurchase() internal constant returns (bool) {
-        return super.validPurchase() || (!hasEnded() && wRegistry.isWhitelisted(msg.sender));
+        return super.validPurchase() || (!hasEnded() && msg.value != 0 && wRegistry.isWhitelisted(msg.sender));
     }
 
     /**
