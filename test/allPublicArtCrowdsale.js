@@ -698,7 +698,7 @@ contract(
 
       it('does NOT set a zero preferential rate ', async () => {
         try {
-          await whitelistRegistryContract.setPreferantialRate(0);
+          await whitelistRegistryContract.setPreferentialRate(0);
           assert.fail();
         } catch (e) {
           ensuresException(e);
@@ -707,7 +707,7 @@ contract(
 
       it('whitelists buyer rate with a preferential rate', async () => {
         await whitelistRegistryContract.addToWhitelist(buyer);
-        await whitelistRegistryContract.setPreferantialRate(preferentialRate);
+        await whitelistRegistryContract.setPreferentialRate(preferentialRate);
 
         const prefRate = await whitelistRegistryContract.preferentialRate();
         prefRate.should.be.bignumber.equal(preferentialRate);

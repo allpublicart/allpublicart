@@ -94,7 +94,7 @@ contract WhitelistRegistry {
      * @dev sets global preferentialRate for whitelisted buyer that has no customized rate
      * @param rate New global preferentialRate
      */
-    function setPreferantialRate(uint256 rate) public onlyOwner {
+    function setPreferentialRate(uint256 rate) public onlyOwner {
         require(rate != 0);
 
         preferentialRate = rate;
